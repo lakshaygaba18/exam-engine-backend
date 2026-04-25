@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: exam-engine-backend
+    env: java
+    buildCommand: "./mvnw clean package"
+    startCommand: "java -jar target/*.jar"
