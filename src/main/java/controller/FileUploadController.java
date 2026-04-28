@@ -52,30 +52,44 @@ public class FileUploadController {
             List<String> lines = Arrays.asList(text.split("\\."));
 
             List<Map<String, Object>> mcqs = new ArrayList<>();
+            Random random = new Random();
+
 
             for (String line : lines) {
                 line = line.trim();
 
-                if (line.length() > 30 && line.length() < 120) {
+                if (line.length() > 40 && line.length() < 150) {
 
                     Map<String, Object> q = new HashMap<>();
 
-                    q.put("question", "What is " + line + "?");
+                    String question = "Which of the following is correct about: " + line + "?";
+                    q.put("question", question);
 
-                    List<String> options = Arrays.asList(
-                            line,
-                            "None of the above",
-                            "All of the above",
-                            "Irrelevant statement"
-                    );
+                    // ✅ Create better options
+                    List<String> options = new ArrayList<>();
+
+                    String correct = line;
+
+                    // Generate distractors
+                    String distractor1 = "This statement is partially incorrect: " + line.substring(0, Math.min(20, line.length()));
+                    String distractor2 = "This refers to a different concept than: " + line.substring(0, Math.min(25, line.length()));
+                    String distractor3 = "This is not related to the given concept";
+
+                    options.add(correct);
+                    options.add(distractor1);
+                    options.add(distractor2);
+                    options.add(distractor3);
+
+                    // 🔥 Shuffle options
+                    Collections.shuffle(options);
 
                     q.put("options", options);
-                    q.put("answer", line);
+                    q.put("answer", correct);
 
                     mcqs.add(q);
                 }
 
-                if (mcqs.size() >= 3) break;
+                if (mcqs.size() >= 5) break;
             }
 
             Map<String, Object> result = new HashMap<>();
