@@ -1,6 +1,5 @@
 package com.examai.exam_engine.controller;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
@@ -10,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
-import java.io.IOException;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.*;
 
@@ -18,12 +17,20 @@ import java.util.*;
 @RequestMapping("/file")
 public class FileUploadController {
 
+    @GetMapping("/test")
+    public String test() {
+        return "Backend is working!";
+    }
+
     private final ObjectMapper mapper = new ObjectMapper();
+
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(Duration.ofSeconds(60))
-            .readTimeout(Duration.ofSeconds(180))
-            .writeTimeout(Duration.ofSeconds(180))
+            .readTimeout(Duration.ofSeconds(240))
+            .writeTimeout(Duration.ofSeconds(240))
             .build();
+
+    private final Map<String, Map<String, Object>> memoryCache = new HashMap<>();
 
     @PostMapping("/upload")
     public Map<String, Object> uploadFile(@RequestParam("file") MultipartFile file) {
@@ -36,9 +43,11 @@ public class FileUploadController {
 
         try {
             String fileName = file.getOriginalFilename();
-            if (fileName == null) fileName = "default.pdf";
+            if (fileName == null || fileName.isBlank()) {
+                fileName = "default.pdf";
+            }
 
-            String filePath = uploadDir + fileName;
+            String filePath = uploadDir + System.currentTimeMillis() + "_" + fileName;
             file.transferTo(new File(filePath));
 
             String text = extractPdfText(filePath);
@@ -47,77 +56,145 @@ public class FileUploadController {
                 return Map.of("error", "PDF content too low or unreadable.");
             }
 
-            List<Map<String, Object>> mcqs = generateMcqsWithOpenAI(text);
+            String normalizedText = normalizeText(text);
+            String hash = sha256(normalizedText);
 
-            Map<String, Object> result = new HashMap<>();
-            result.put("mcqs", mcqs);
-            return result;
+            if (memoryCache.containsKey(hash)) {
+                return memoryCache.get(hash);
+            }
+
+            Map<String, Object> aiResult = generateExamPrepWithOpenAI(normalizedText);
+
+            memoryCache.put(hash, aiResult);
+
+            return aiResult;
 
         } catch (Exception e) {
             e.printStackTrace();
-            return Map.of("error", e.getMessage());
+
+            Map<String, Object> fallback = new HashMap<>();
+            fallback.put("error", e.getMessage());
+            fallback.put("fallback", true);
+            fallback.put("data", fallbackGenerate());
+
+            return fallback;
         }
     }
 
-    private String extractPdfText(String filePath) throws IOException {
-        File savedFile = new File(filePath);
-        PDDocument document = PDDocument.load(savedFile);
-
-        PDFTextStripper pdfStripper = new PDFTextStripper();
-        String text = pdfStripper.getText(document);
-
-        document.close();
-        return text;
+    @GetMapping("/test")
+    public String test() {
+        return "Backend is working!";
     }
 
-    private List<Map<String, Object>> generateMcqsWithOpenAI(String text) throws Exception {
+    private String extractPdfText(String filePath) throws Exception {
+        File savedFile = new File(filePath);
+
+        try (PDDocument document = PDDocument.load(savedFile)) {
+            PDFTextStripper pdfStripper = new PDFTextStripper();
+            return pdfStripper.getText(document);
+        }
+    }
+
+    private String normalizeText(String text) {
+        String cleaned = text
+                .replaceAll("\\s+", " ")
+                .replaceAll("[^\\x00-\\x7F]", " ")
+                .trim();
+
+        int maxChars = 9000;
+
+        if (cleaned.length() <= maxChars) {
+            return cleaned;
+        }
+
+        String start = cleaned.substring(0, 4500);
+        String middle = cleaned.substring(cleaned.length() / 2, Math.min(cleaned.length() / 2 + 2500, cleaned.length()));
+        String end = cleaned.substring(Math.max(cleaned.length() - 2000, 0));
+
+        return start + "\n\n" + middle + "\n\n" + end;
+    }
+
+    private Map<String, Object> generateExamPrepWithOpenAI(String text) throws Exception {
         String apiKey = System.getenv("OPENAI_API_KEY");
 
         if (apiKey == null || apiKey.isBlank()) {
             throw new RuntimeException("OPENAI_API_KEY is missing.");
         }
 
-        String cleanedText = text
-                .replaceAll("\\s+", " ")
-                .trim();
-
-        if (cleanedText.length() > 12000) {
-            cleanedText = cleanedText.substring(0, 12000);
-        }
-
         String prompt = """
-                You are an expert exam question generator.
+                You are an expert exam preparation assistant.
 
-                Generate 15 high-quality MCQs from the PDF content below.
+                Generate exam-focused study material from the PDF content.
 
-                STRICT RULES:
-                1. Questions must be logical and exam-relevant.
-                2. Do NOT ask vague questions like "Which statement is correct?"
-                3. Each question must test a clear concept from the content.
-                4. Each MCQ must have exactly 4 options.
-                5. All options must look relevant and believable.
-                6. Do NOT use "All of the above" or "None of the above".
-                7. Correct answer position must be randomly distributed.
-                8. Options must be similar in length and style.
-                9. Avoid copying huge sentences directly from the PDF.
-                10. Return ONLY valid JSON.
+                Return ONLY valid JSON. No markdown. No explanation outside JSON.
 
-                JSON format:
+                Required JSON structure:
                 {
-                  "mcqs": [
+                  "objective": {
+                    "viva": [
+                      {
+                        "question": "short viva question",
+                        "answer": "one-line answer"
+                      }
+                    ]
+                  },
+                  "subjective": {
+                    "one_mark": [
+                      {
+                        "question": "1 mark question",
+                        "answer": "short answer"
+                      }
+                    ],
+                    "three_mark": [
+                      {
+                        "question": "3 mark question",
+                        "answer": "medium answer in 3-5 bullet points"
+                      }
+                    ],
+                    "five_mark": [
+                      {
+                        "question": "5 mark question",
+                        "answer": "detailed answer with headings/bullets"
+                      }
+                    ],
+                    "ten_mark": [
+                      {
+                        "question": "10 mark question",
+                        "answer": "long exam-style answer with structure, examples if relevant"
+                      }
+                    ]
+                  },
+                  "cheat_sheet": [
                     {
-                      "question": "question text",
-                      "options": ["option A", "option B", "option C", "option D"],
-                      "answer": "exact correct option text"
+                      "title": "important topic/formula/definition",
+                      "points": ["short point 1", "short point 2"]
                     }
                   ]
                 }
 
+                Strict rules:
+                1. Focus only on important concepts from the PDF.
+                2. Do not generate random or vague questions.
+                3. Avoid irrelevant content.
+                4. Viva answers must be one-liners.
+                5. 1 mark answers must be short.
+                6. 3 mark answers should be concise bullet points.
+                7. 5 mark and 10 mark answers should be exam-ready.
+                8. Cheat sheet must be last-minute revision friendly.
+                9. Keep the output compact but useful.
+                10. Generate:
+                    - 12 viva questions
+                    - 8 one_mark questions
+                    - 6 three_mark questions
+                    - 4 five_mark questions
+                    - 2 ten_mark questions
+                    - 8 cheat_sheet items
+
                 PDF CONTENT:
-                """ + cleanedText;
+                """ + text;
 
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "gpt-4.1-mini");
+        requestBody.put("model", "gpt-4o-mini");
         requestBody.put("input", prompt);
 
         String jsonBody = mapper.writeValueAsString(requestBody);
@@ -126,7 +203,10 @@ public class FileUploadController {
                 .url("https://api.openai.com/v1/responses")
                 .addHeader("Authorization", "Bearer " + apiKey)
                 .addHeader("Content-Type", "application/json")
-                .post(okhttp3.RequestBody.create(jsonBody, MediaType.parse("application/json")))
+                .post(okhttp3.RequestBody.create(
+                        jsonBody,
+                        MediaType.parse("application/json")
+                ))
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
@@ -138,23 +218,16 @@ public class FileUploadController {
 
             JsonNode root = mapper.readTree(body);
             String outputText = extractOutputText(root);
-
             outputText = cleanJson(outputText);
 
-            JsonNode mcqRoot = mapper.readTree(outputText);
-            JsonNode mcqsNode = mcqRoot.get("mcqs");
+            JsonNode resultNode = mapper.readTree(outputText);
 
-            if (mcqsNode == null || !mcqsNode.isArray()) {
-                throw new RuntimeException("Invalid AI response format.");
-            }
+            validateResult(resultNode);
 
-            List<Map<String, Object>> mcqs = mapper.convertValue(
-                    mcqsNode,
-                    new TypeReference<List<Map<String, Object>>>() {}
-            );
+            Map<String, Object> result = mapper.convertValue(resultNode, Map.class);
+            result.put("mode", "qa_engine");
 
-            validateMcqs(mcqs);
-            return mcqs;
+            return result;
         }
     }
 
@@ -190,31 +263,56 @@ public class FileUploadController {
                 .trim();
     }
 
-    private void validateMcqs(List<Map<String, Object>> mcqs) {
-        if (mcqs == null || mcqs.isEmpty()) {
-            throw new RuntimeException("No MCQs generated.");
+    private void validateResult(JsonNode node) {
+        if (node.get("objective") == null ||
+                node.get("subjective") == null ||
+                node.get("cheat_sheet") == null) {
+            throw new RuntimeException("Invalid AI response structure.");
+        }
+    }
+
+    private Map<String, Object> fallbackGenerate() {
+        Map<String, Object> fallback = new HashMap<>();
+
+        Map<String, Object> objective = new HashMap<>();
+        objective.put("viva", List.of(
+                Map.of("question", "What is the main purpose of this chapter?", "answer", "To explain the key concepts required for exam preparation."),
+                Map.of("question", "Why is revision important?", "answer", "Revision helps retain concepts and improve exam performance.")
+        ));
+
+        Map<String, Object> subjective = new HashMap<>();
+        subjective.put("one_mark", List.of(
+                Map.of("question", "Define the main topic.", "answer", "It refers to the central concept discussed in the study material.")
+        ));
+        subjective.put("three_mark", List.of(
+                Map.of("question", "Write short notes on the main concept.", "answer", "• Understand the definition\n• Learn the key points\n• Revise examples")
+        ));
+        subjective.put("five_mark", List.of(
+                Map.of("question", "Explain the topic in detail.", "answer", "This topic should be explained with definition, key points, examples, and conclusion.")
+        ));
+        subjective.put("ten_mark", List.of(
+                Map.of("question", "Discuss the chapter comprehensively.", "answer", "A complete answer should include introduction, explanation, important points, examples, applications, and conclusion.")
+        ));
+
+        fallback.put("objective", objective);
+        fallback.put("subjective", subjective);
+        fallback.put("cheat_sheet", List.of(
+                Map.of("title", "Last minute tip", "points", List.of("Revise definitions", "Focus on important concepts", "Practice writing answers"))
+        ));
+        fallback.put("mode", "fallback");
+
+        return fallback;
+    }
+
+    private String sha256(String input) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(input.getBytes());
+
+        StringBuilder hex = new StringBuilder();
+        for (byte b : hash) {
+            hex.append(String.format("%02x", b));
         }
 
-        for (Map<String, Object> mcq : mcqs) {
-            if (!mcq.containsKey("question") ||
-                    !mcq.containsKey("options") ||
-                    !mcq.containsKey("answer")) {
-                throw new RuntimeException("Invalid MCQ structure.");
-            }
-
-            Object optionsObj = mcq.get("options");
-
-            if (!(optionsObj instanceof List<?> options) || options.size() != 4) {
-                throw new RuntimeException("Each MCQ must have exactly 4 options.");
-            }
-
-            String answer = String.valueOf(mcq.get("answer"));
-            boolean answerExists = options.stream()
-                    .anyMatch(option -> String.valueOf(option).equals(answer));
-
-            if (!answerExists) {
-                throw new RuntimeException("Answer must exactly match one option.");
-            }
-        }
+        return hex.toString();
     }
 }
