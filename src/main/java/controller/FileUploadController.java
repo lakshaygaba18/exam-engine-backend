@@ -17,11 +17,6 @@ import java.util.*;
 @RequestMapping("/file")
 public class FileUploadController {
 
-    @GetMapping("/test")
-    public String test() {
-        return "Backend is working!";
-    }
-
     private final ObjectMapper mapper = new ObjectMapper();
 
     private final OkHttpClient client = new OkHttpClient.Builder()
@@ -31,6 +26,11 @@ public class FileUploadController {
             .build();
 
     private final Map<String, Map<String, Object>> memoryCache = new HashMap<>();
+
+    @GetMapping("/test")
+    public String test() {
+        return "Backend is working!";
+    }
 
     @PostMapping("/upload")
     public Map<String, Object> uploadFile(@RequestParam("file") MultipartFile file) {
@@ -64,7 +64,6 @@ public class FileUploadController {
             }
 
             Map<String, Object> aiResult = generateExamPrepWithOpenAI(normalizedText);
-
             memoryCache.put(hash, aiResult);
 
             return aiResult;
@@ -79,11 +78,6 @@ public class FileUploadController {
 
             return fallback;
         }
-    }
-
-    @GetMapping("/test")
-    public String test() {
-        return "Backend is working!";
     }
 
     private String extractPdfText(String filePath) throws Exception {
@@ -108,7 +102,10 @@ public class FileUploadController {
         }
 
         String start = cleaned.substring(0, 4500);
-        String middle = cleaned.substring(cleaned.length() / 2, Math.min(cleaned.length() / 2 + 2500, cleaned.length()));
+        String middle = cleaned.substring(
+                cleaned.length() / 2,
+                Math.min(cleaned.length() / 2 + 2500, cleaned.length())
+        );
         String end = cleaned.substring(Math.max(cleaned.length() - 2000, 0));
 
         return start + "\n\n" + middle + "\n\n" + end;
@@ -217,11 +214,9 @@ public class FileUploadController {
             }
 
             JsonNode root = mapper.readTree(body);
-            String outputText = extractOutputText(root);
-            outputText = cleanJson(outputText);
+            String outputText = cleanJson(extractOutputText(root));
 
             JsonNode resultNode = mapper.readTree(outputText);
-
             validateResult(resultNode);
 
             Map<String, Object> result = mapper.convertValue(resultNode, Map.class);
