@@ -56,17 +56,10 @@ public class FileUploadController {
                 return Map.of("error", "PDF content too low or unreadable.");
             }
 
-            String normalizedText = normalizeText(text);
-            String hash = sha256(normalizedText);
-
-            if (memoryCache.containsKey(hash)) {
-                return memoryCache.get(hash);
-            }
-
-            Map<String, Object> aiResult = generateExamPrepWithOpenAI(normalizedText);
-            memoryCache.put(hash, aiResult);
-
-            return aiResult;
+            Map<String, Object> fallback = fallbackGenerate();
+            fallback.put("fallback", true);
+            fallback.put("message", "AI disabled for now. Using demo exam data.");
+            return fallback;
 
         } catch (Exception e) {
             e.printStackTrace();
