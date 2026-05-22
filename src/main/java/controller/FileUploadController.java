@@ -260,135 +260,63 @@ public class FileUploadController {
     }
 
     private Map<String, Object> fallbackGenerate() {
-
         Map<String, Object> response = new HashMap<>();
 
-        // =========================
-        // VIVA QUESTIONS
-        // =========================
+        Map<String, Object> objective = new HashMap<>();
 
-        List<Map<String, String>> viva = new ArrayList<>();
-
-        viva.add(Map.of(
-                "question", "What is an Operating System?",
-                "answer", "System software that manages computer hardware and software resources."
+        objective.put("viva", List.of(
+                Map.of("question", "What is an Operating System?", "answer", "System software that manages hardware and software resources."),
+                Map.of("question", "What is DBMS?", "answer", "Database Management System used to store and manage data."),
+                Map.of("question", "What is CPU scheduling?", "answer", "Method used by OS to allocate CPU to processes.")
         ));
-
-        viva.add(Map.of(
-                "question", "What is DBMS?",
-                "answer", "Database Management System used to store and manage data."
-        ));
-
-        viva.add(Map.of(
-                "question", "What is CPU scheduling?",
-                "answer", "Method used by OS to allocate CPU to processes."
-        ));
-
-        viva.add(Map.of(
-                "question", "Define normalization.",
-                "answer", "Process of organizing database tables to reduce redundancy."
-        ));
-
-        viva.add(Map.of(
-                "question", "What is recursion?",
-                "answer", "Function calling itself repeatedly."
-        ));
-
-        response.put("viva", viva);
-
-        // =========================
-        // SUBJECTIVE QUESTIONS
-        // =========================
 
         Map<String, Object> subjective = new HashMap<>();
 
-        // 1 MARK
-        List<Map<String, String>> oneMark = new ArrayList<>();
-
-        oneMark.add(Map.of(
-                "question", "Define Algorithm.",
-                "answer", "A step-by-step procedure to solve a problem."
+        subjective.put("one_mark", List.of(
+                Map.of("question", "Define Algorithm.", "answer", "A step-by-step procedure to solve a problem."),
+                Map.of("question", "What is RAM?", "answer", "Temporary primary memory used during execution.")
         ));
 
-        oneMark.add(Map.of(
-                "question", "What is RAM?",
-                "answer", "Temporary primary memory used during execution."
+        subjective.put("three_mark", List.of(
+                Map.of("question", "Explain process states.", "answer", "Processes move through ready, running, waiting, and terminated states."),
+                Map.of("question", "Explain primary key.", "answer", "A primary key uniquely identifies each row in a database table.")
         ));
 
-        // 3 MARK
-        List<Map<String, String>> threeMark = new ArrayList<>();
-
-        threeMark.add(Map.of(
-                "question", "Explain process states.",
-                "answer", "Processes move through states like ready, running, waiting and terminated."
+        subjective.put("five_mark", List.of(
+                Map.of("question", "Explain deadlock.", "answer", "Deadlock occurs when processes wait indefinitely for resources held by each other. It happens due to mutual exclusion, hold and wait, no preemption, and circular wait."),
+                Map.of("question", "Explain normalization.", "answer", "Normalization organizes database tables to reduce redundancy and improve consistency using forms like 1NF, 2NF, and 3NF.")
         ));
 
-        threeMark.add(Map.of(
-                "question", "Explain primary key.",
-                "answer", "Primary key uniquely identifies each row in a database table."
+        subjective.put("ten_mark", List.of(
+                Map.of("question", "Explain DBMS architecture.", "answer", "DBMS architecture has external, conceptual, and internal levels. External level shows user views, conceptual level shows logical structure, and internal level manages physical storage."),
+                Map.of("question", "Explain paging and segmentation.", "answer", "Paging divides memory into fixed-size pages and frames, while segmentation divides programs into logical parts like code, data, and stack.")
         ));
 
-        // 5 MARK
-        List<Map<String, String>> fiveMark = new ArrayList<>();
-
-        fiveMark.add(Map.of(
-                "question", "Explain Deadlock in Operating System.",
-                "answer", "Deadlock occurs when multiple processes wait indefinitely for resources held by each other."
-        ));
-
-        fiveMark.add(Map.of(
-                "question", "Explain normalization with examples.",
-                "answer", "Normalization removes redundancy using normal forms like 1NF, 2NF and 3NF."
-        ));
-
-        // 10 MARK
-        List<Map<String, String>> tenMark = new ArrayList<>();
-
-        tenMark.add(Map.of(
-                "question", "Explain DBMS architecture in detail.",
-                "answer", "DBMS architecture includes external level, conceptual level and internal level for data abstraction and management."
-        ));
-
-        tenMark.add(Map.of(
-                "question", "Explain paging and segmentation.",
-                "answer", "Paging divides memory into fixed-size blocks while segmentation divides programs logically into segments."
-        ));
-
-        subjective.put("one_mark", oneMark);
-        subjective.put("three_mark", threeMark);
-        subjective.put("five_mark", fiveMark);
-        subjective.put("ten_mark", tenMark);
-
+        response.put("objective", objective);
         response.put("subjective", subjective);
 
-        // =========================
-        // CHEAT SHEET
-        // =========================
-
-        List<Map<String, Object>> cheatSheet = new ArrayList<>();
-
-        cheatSheet.add(Map.of(
-                "title", "Operating System",
-                "points", List.of(
-                        "OS manages hardware and software.",
-                        "CPU scheduling improves efficiency.",
-                        "Deadlock occurs due to circular wait.",
-                        "Paging avoids external fragmentation."
+        response.put("cheat_sheet", List.of(
+                Map.of(
+                        "title", "Operating System",
+                        "points", List.of(
+                                "OS manages hardware and software.",
+                                "CPU scheduling improves performance.",
+                                "Deadlock occurs due to circular wait.",
+                                "Paging reduces external fragmentation."
+                        )
+                ),
+                Map.of(
+                        "title", "DBMS",
+                        "points", List.of(
+                                "DBMS stores and manages data.",
+                                "Primary key uniquely identifies rows.",
+                                "Normalization reduces redundancy.",
+                                "SQL is used for database operations."
+                        )
                 )
         ));
 
-        cheatSheet.add(Map.of(
-                "title", "DBMS",
-                "points", List.of(
-                        "Normalization reduces redundancy.",
-                        "Primary key uniquely identifies rows.",
-                        "SQL is used for database queries.",
-                        "Transactions maintain consistency."
-                )
-        ));
-
-        response.put("cheat_sheet", cheatSheet);
-
+        response.put("mode", "fallback");
         return response;
     }
 
