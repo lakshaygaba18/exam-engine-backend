@@ -260,36 +260,136 @@ public class FileUploadController {
     }
 
     private Map<String, Object> fallbackGenerate() {
-        Map<String, Object> fallback = new HashMap<>();
 
-        Map<String, Object> objective = new HashMap<>();
-        objective.put("viva", List.of(
-                Map.of("question", "What is the main purpose of this chapter?", "answer", "To explain the key concepts required for exam preparation."),
-                Map.of("question", "Why is revision important?", "answer", "Revision helps retain concepts and improve exam performance.")
+        Map<String, Object> response = new HashMap<>();
+
+        // =========================
+        // VIVA QUESTIONS
+        // =========================
+
+        List<Map<String, String>> viva = new ArrayList<>();
+
+        viva.add(Map.of(
+                "question", "What is an Operating System?",
+                "answer", "System software that manages computer hardware and software resources."
         ));
+
+        viva.add(Map.of(
+                "question", "What is DBMS?",
+                "answer", "Database Management System used to store and manage data."
+        ));
+
+        viva.add(Map.of(
+                "question", "What is CPU scheduling?",
+                "answer", "Method used by OS to allocate CPU to processes."
+        ));
+
+        viva.add(Map.of(
+                "question", "Define normalization.",
+                "answer", "Process of organizing database tables to reduce redundancy."
+        ));
+
+        viva.add(Map.of(
+                "question", "What is recursion?",
+                "answer", "Function calling itself repeatedly."
+        ));
+
+        response.put("viva", viva);
+
+        // =========================
+        // SUBJECTIVE QUESTIONS
+        // =========================
 
         Map<String, Object> subjective = new HashMap<>();
-        subjective.put("one_mark", List.of(
-                Map.of("question", "Define the main topic.", "answer", "It refers to the central concept discussed in the study material.")
-        ));
-        subjective.put("three_mark", List.of(
-                Map.of("question", "Write short notes on the main concept.", "answer", "• Understand the definition\n• Learn the key points\n• Revise examples")
-        ));
-        subjective.put("five_mark", List.of(
-                Map.of("question", "Explain the topic in detail.", "answer", "This topic should be explained with definition, key points, examples, and conclusion.")
-        ));
-        subjective.put("ten_mark", List.of(
-                Map.of("question", "Discuss the chapter comprehensively.", "answer", "A complete answer should include introduction, explanation, important points, examples, applications, and conclusion.")
+
+        // 1 MARK
+        List<Map<String, String>> oneMark = new ArrayList<>();
+
+        oneMark.add(Map.of(
+                "question", "Define Algorithm.",
+                "answer", "A step-by-step procedure to solve a problem."
         ));
 
-        fallback.put("objective", objective);
-        fallback.put("subjective", subjective);
-        fallback.put("cheat_sheet", List.of(
-                Map.of("title", "Last minute tip", "points", List.of("Revise definitions", "Focus on important concepts", "Practice writing answers"))
+        oneMark.add(Map.of(
+                "question", "What is RAM?",
+                "answer", "Temporary primary memory used during execution."
         ));
-        fallback.put("mode", "fallback");
 
-        return fallback;
+        // 3 MARK
+        List<Map<String, String>> threeMark = new ArrayList<>();
+
+        threeMark.add(Map.of(
+                "question", "Explain process states.",
+                "answer", "Processes move through states like ready, running, waiting and terminated."
+        ));
+
+        threeMark.add(Map.of(
+                "question", "Explain primary key.",
+                "answer", "Primary key uniquely identifies each row in a database table."
+        ));
+
+        // 5 MARK
+        List<Map<String, String>> fiveMark = new ArrayList<>();
+
+        fiveMark.add(Map.of(
+                "question", "Explain Deadlock in Operating System.",
+                "answer", "Deadlock occurs when multiple processes wait indefinitely for resources held by each other."
+        ));
+
+        fiveMark.add(Map.of(
+                "question", "Explain normalization with examples.",
+                "answer", "Normalization removes redundancy using normal forms like 1NF, 2NF and 3NF."
+        ));
+
+        // 10 MARK
+        List<Map<String, String>> tenMark = new ArrayList<>();
+
+        tenMark.add(Map.of(
+                "question", "Explain DBMS architecture in detail.",
+                "answer", "DBMS architecture includes external level, conceptual level and internal level for data abstraction and management."
+        ));
+
+        tenMark.add(Map.of(
+                "question", "Explain paging and segmentation.",
+                "answer", "Paging divides memory into fixed-size blocks while segmentation divides programs logically into segments."
+        ));
+
+        subjective.put("one_mark", oneMark);
+        subjective.put("three_mark", threeMark);
+        subjective.put("five_mark", fiveMark);
+        subjective.put("ten_mark", tenMark);
+
+        response.put("subjective", subjective);
+
+        // =========================
+        // CHEAT SHEET
+        // =========================
+
+        List<Map<String, Object>> cheatSheet = new ArrayList<>();
+
+        cheatSheet.add(Map.of(
+                "title", "Operating System",
+                "points", List.of(
+                        "OS manages hardware and software.",
+                        "CPU scheduling improves efficiency.",
+                        "Deadlock occurs due to circular wait.",
+                        "Paging avoids external fragmentation."
+                )
+        ));
+
+        cheatSheet.add(Map.of(
+                "title", "DBMS",
+                "points", List.of(
+                        "Normalization reduces redundancy.",
+                        "Primary key uniquely identifies rows.",
+                        "SQL is used for database queries.",
+                        "Transactions maintain consistency."
+                )
+        ));
+
+        response.put("cheat_sheet", cheatSheet);
+
+        return response;
     }
 
     private String sha256(String input) throws Exception {
