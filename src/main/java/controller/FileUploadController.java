@@ -325,20 +325,42 @@ public class FileUploadController {
 
         List<String> sentences = Arrays.stream(text.split("[.!?]"))
                 .map(String::trim)
-                .filter(s -> s.length() > 35 && s.length() < 220)
-                .limit(20)
+                .map(s -> s.replaceAll("\\s+", " "))
+                .filter(s -> s.length() > 45 && s.length() < 260)
+                .filter(s -> !s.matches(".*\\b(page|copyright|www|http|figure|table)\\b.*"))
+                .distinct()
+                .limit(30)
                 .toList();
 
         if (sentences.isEmpty()) {
             return fallbackGenerate();
         }
 
+        List<String> important = sentences.stream()
+                .filter(s ->
+                        s.toLowerCase().contains("important") ||
+                                s.toLowerCase().contains("means") ||
+                                s.toLowerCase().contains("defined") ||
+                                s.toLowerCase().contains("helps") ||
+                                s.toLowerCase().contains("because") ||
+                                s.toLowerCase().contains("process") ||
+                                s.toLowerCase().contains("method") ||
+                                s.toLowerCase().contains("benefit") ||
+                                s.toLowerCase().contains("role")
+                )
+                .toList();
+
+        if (important.size() < 8) {
+            important = sentences;
+        }
+
         List<Map<String, String>> viva = new ArrayList<>();
-        for (int i = 0; i < Math.min(8, sentences.size()); i++) {
-            String sentence = sentences.get(i);
+        for (int i = 0; i < Math.min(10, important.size()); i++) {
+            String point = important.get(i);
+
             viva.add(Map.of(
-                    "question", "What does the PDF mention about this concept?",
-                    "answer", sentence
+                    "question", "What is the key idea discussed here?",
+                    "answer", point
             ));
         }
 
@@ -352,38 +374,48 @@ public class FileUploadController {
         List<Map<String, String>> fiveMark = new ArrayList<>();
         List<Map<String, String>> tenMark = new ArrayList<>();
 
-        for (int i = 0; i < sentences.size(); i++) {
-            String sentence = sentences.get(i);
+        for (int i = 0; i < important.size(); i++) {
+            String point = important.get(i);
+
+            if (i < 6) {
+                oneMark.add(Map.of(
+                        "question", "Write one important point from the PDF.",
+                        "answer", point
+                ));
+            }
 
             if (i < 5) {
-                oneMark.add(Map.of(
-                        "question", "Write one key point from the PDF.",
-                        "answer", sentence
+                threeMark.add(Map.of(
+                        "question", "Explain the following concept briefly.",
+                        "answer",
+                        "• " + point + "\n" +
+                                "• This point is important for understanding the topic.\n" +
+                                "• It can be revised as a short-answer exam point."
                 ));
             }
 
             if (i < 4) {
-                threeMark.add(Map.of(
-                        "question", "Explain this point briefly.",
-                        "answer", "• " + sentence + "\n• This point is important for understanding the topic.\n• It can be used in short-answer exam preparation."
-                ));
-            }
-
-            if (i < 3) {
                 fiveMark.add(Map.of(
-                        "question", "Explain the concept discussed in the PDF.",
-                        "answer", "Introduction:\n" + sentence +
-                                "\n\nExplanation:\nThis concept is important because it supports the main theme of the PDF and helps in understanding the topic clearly." +
-                                "\n\nConclusion:\nIt should be revised as an important exam point."
+                        "question", "Explain an important concept from the PDF.",
+                        "answer",
+                        "Introduction:\n" + point + "\n\n" +
+                                "Explanation:\nThis concept is important because it supports the main theme of the PDF. It helps in understanding the topic clearly and can be used while writing exam answers.\n\n" +
+                                "Conclusion:\nThis point should be revised as an important part of last-minute preparation."
                 ));
             }
 
             if (i < 2) {
                 tenMark.add(Map.of(
                         "question", "Discuss the topic explained in the PDF in detail.",
-                        "answer", "Introduction:\n" + sentence +
-                                "\n\nMain Explanation:\nThe PDF explains this idea as an important part of the topic. It should be understood with its meaning, purpose, and practical importance." +
-                                "\n\nKey Points:\n• Understand the core idea\n• Learn the related explanation\n• Revise it before exams\n\nConclusion:\nThis topic is useful for both short and long answer preparation."
+                        "answer",
+                        "Introduction:\n" + point + "\n\n" +
+                                "Detailed Explanation:\nThe PDF presents this as an important idea. It should be understood with its meaning, purpose, and practical importance. A good exam answer should explain the concept clearly and connect it with the broader topic.\n\n" +
+                                "Key Points:\n" +
+                                "• Understand the core meaning\n" +
+                                "• Explain why it is important\n" +
+                                "• Add supporting points from the PDF\n" +
+                                "• Write the answer in a structured way\n\n" +
+                                "Conclusion:\nThis topic is useful for both short-answer and long-answer preparation."
                 ));
             }
         }
@@ -395,17 +427,21 @@ public class FileUploadController {
 
         List<Map<String, Object>> cheatSheet = new ArrayList<>();
 
-        for (int i = 0; i < Math.min(6, sentences.size()); i++) {
+        for (int i = 0; i < Math.min(8, important.size()); i++) {
             cheatSheet.add(Map.of(
                     "title", "Important Point " + (i + 1),
-                    "points", List.of(sentences.get(i))
+                    "points", List.of(
+                            important.get(i),
+                            "Revise this point before exam.",
+                            "Can be used in short or long answers."
+                    )
             ));
         }
 
         response.put("objective", objective);
         response.put("subjective", subjective);
         response.put("cheat_sheet", cheatSheet);
-        response.put("mode", "pdf_fallback");
+        response.put("mode", "pdf_fallback_quality");
 
         return response;
     }
