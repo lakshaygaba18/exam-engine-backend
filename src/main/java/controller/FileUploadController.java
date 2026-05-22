@@ -33,45 +33,62 @@ public class FileUploadController {
     }
 
     @PostMapping("/upload")
-    public Map<String, Object> uploadFile(@RequestParam("file") MultipartFile file) {
-        String uploadDir = System.getProperty("user.dir") + "/uploads/";
+    private String extractTopic(String sentence) {
+        String cleaned = sentence
+                .replaceAll("[^a-zA-Z0-9 ]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
 
-        File dir = new File(uploadDir);
-        if (!dir.exists()) {
-            dir.mkdirs();
+        String[] words = cleaned.split(" ");
+
+        List<String> stopWords = List.of(
+                "the", "is", "are", "was", "were", "and", "or", "but",
+                "this", "that", "these", "those", "with", "from", "into",
+                "about", "because", "which", "while", "where", "when",
+                "have", "has", "had", "can", "will", "shall", "should",
+                "would", "could", "also", "more", "most", "very", "their",
+                "there", "then", "than", "been", "being", "such", "only",
+                "for", "you", "your", "its", "our", "they", "them"
+        );
+
+        for (String word : words) {
+            String lower = word.toLowerCase();
+
+            if (word.length() > 5 && !stopWords.contains(lower)) {
+                return word;
+            }
         }
 
-        try {
-            String fileName = file.getOriginalFilename();
-            if (fileName == null || fileName.isBlank()) {
-                fileName = "default.pdf";
-            }
-
-            String filePath = uploadDir + System.currentTimeMillis() + "_" + fileName;
-            file.transferTo(new File(filePath));
-
-            String text = extractPdfText(filePath);
-
-            if (text == null || text.trim().length() < 100) {
-                return Map.of("error", "PDF content too low or unreadable.");
-            }
-
-            String normalizedText = normalizeText(text);
-            Map<String, Object> fallback = fallbackGenerateFromText(normalizedText);
-            fallback.put("fallback", true);
-            fallback.put("message", "AI disabled for now. Using PDF-based fallback data.");
-            return fallback;
-
-        } catch (Exception e) {
-            e.printStackTrace();
-
-            Map<String, Object> fallback = new HashMap<>();
-            fallback.put("error", e.getMessage());
-            fallback.put("fallback", true);
-            fallback.put("data", fallbackGenerate());
-
-            return fallback;
+        if (words.length >= 3) {
+            return words[0] + " " + words[1] + " " + words[2];
         }
+
+        return cleaned.length() > 25 ? cleaned.substring(0, 25) : cleaned;
+    }
+
+    private String generateVivaQuestion(String sentence) {
+        String topic = extractTopic(sentence);
+        return "What does the PDF explain about " + topic + "?";
+    }
+
+    private String generateOneMarkQuestion(String sentence) {
+        String topic = extractTopic(sentence);
+        return "Define or state one key point about " + topic + ".";
+    }
+
+    private String generateThreeMarkQuestion(String sentence) {
+        String topic = extractTopic(sentence);
+        return "Explain " + topic + " briefly.";
+    }
+
+    private String generateFiveMarkQuestion(String sentence) {
+        String topic = extractTopic(sentence);
+        return "Explain the importance of " + topic + ".";
+    }
+
+    private String generateTenMarkQuestion(String sentence) {
+        String topic = extractTopic(sentence);
+        return "Discuss " + topic + " in detail with key points.";
     }
 
     private String extractPdfText(String filePath) throws Exception {
@@ -359,7 +376,7 @@ public class FileUploadController {
             String point = important.get(i);
 
             viva.add(Map.of(
-                    "question", "What is the key idea discussed here?",
+                    "question", generateVivaQuestion(point),
                     "answer", point
             ));
         }
@@ -379,14 +396,14 @@ public class FileUploadController {
 
             if (i < 6) {
                 oneMark.add(Map.of(
-                        "question", "Write one important point from the PDF.",
+                        "question", generateOneMarkQuestion(point),
                         "answer", point
                 ));
             }
 
             if (i < 5) {
                 threeMark.add(Map.of(
-                        "question", "Explain the following concept briefly.",
+                        "question", generateThreeMarkQuestion(point),
                         "answer",
                         "• " + point + "\n" +
                                 "• This point is important for understanding the topic.\n" +
@@ -396,7 +413,7 @@ public class FileUploadController {
 
             if (i < 4) {
                 fiveMark.add(Map.of(
-                        "question", "Explain an important concept from the PDF.",
+                        "question", generateFiveMarkQuestion(point),
                         "answer",
                         "Introduction:\n" + point + "\n\n" +
                                 "Explanation:\nThis concept is important because it supports the main theme of the PDF. It helps in understanding the topic clearly and can be used while writing exam answers.\n\n" +
@@ -406,7 +423,7 @@ public class FileUploadController {
 
             if (i < 2) {
                 tenMark.add(Map.of(
-                        "question", "Discuss the topic explained in the PDF in detail.",
+                        "question", generateTenMarkQuestion(point),
                         "answer",
                         "Introduction:\n" + point + "\n\n" +
                                 "Detailed Explanation:\nThe PDF presents this as an important idea. It should be understood with its meaning, purpose, and practical importance. A good exam answer should explain the concept clearly and connect it with the broader topic.\n\n" +
