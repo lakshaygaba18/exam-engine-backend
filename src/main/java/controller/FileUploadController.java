@@ -56,6 +56,7 @@ public class FileUploadController {
                 return Map.of("error", "PDF content too low or unreadable.");
             }
 
+            String normalizedText = normalizeText(text);
             Map<String, Object> fallback = fallbackGenerateFromText(normalizedText);
             fallback.put("fallback", true);
             fallback.put("message", "AI disabled for now. Using PDF-based fallback data.");
