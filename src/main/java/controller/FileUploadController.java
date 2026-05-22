@@ -56,9 +56,9 @@ public class FileUploadController {
                 return Map.of("error", "PDF content too low or unreadable.");
             }
 
-            Map<String, Object> fallback = fallbackGenerate();
+            Map<String, Object> fallback = fallbackGenerateFromText(normalizedText);
             fallback.put("fallback", true);
-            fallback.put("message", "AI disabled for now. Using demo exam data.");
+            fallback.put("message", "AI disabled for now. Using PDF-based fallback data.");
             return fallback;
 
         } catch (Exception e) {
@@ -317,6 +317,95 @@ public class FileUploadController {
         ));
 
         response.put("mode", "fallback");
+        return response;
+    }
+    private Map<String, Object> fallbackGenerateFromText(String text) {
+        Map<String, Object> response = new HashMap<>();
+
+        List<String> sentences = Arrays.stream(text.split("[.!?]"))
+                .map(String::trim)
+                .filter(s -> s.length() > 35 && s.length() < 220)
+                .limit(20)
+                .toList();
+
+        if (sentences.isEmpty()) {
+            return fallbackGenerate();
+        }
+
+        List<Map<String, String>> viva = new ArrayList<>();
+        for (int i = 0; i < Math.min(8, sentences.size()); i++) {
+            String sentence = sentences.get(i);
+            viva.add(Map.of(
+                    "question", "What does the PDF mention about this concept?",
+                    "answer", sentence
+            ));
+        }
+
+        Map<String, Object> objective = new HashMap<>();
+        objective.put("viva", viva);
+
+        Map<String, Object> subjective = new HashMap<>();
+
+        List<Map<String, String>> oneMark = new ArrayList<>();
+        List<Map<String, String>> threeMark = new ArrayList<>();
+        List<Map<String, String>> fiveMark = new ArrayList<>();
+        List<Map<String, String>> tenMark = new ArrayList<>();
+
+        for (int i = 0; i < sentences.size(); i++) {
+            String sentence = sentences.get(i);
+
+            if (i < 5) {
+                oneMark.add(Map.of(
+                        "question", "Write one key point from the PDF.",
+                        "answer", sentence
+                ));
+            }
+
+            if (i < 4) {
+                threeMark.add(Map.of(
+                        "question", "Explain this point briefly.",
+                        "answer", "• " + sentence + "\n• This point is important for understanding the topic.\n• It can be used in short-answer exam preparation."
+                ));
+            }
+
+            if (i < 3) {
+                fiveMark.add(Map.of(
+                        "question", "Explain the concept discussed in the PDF.",
+                        "answer", "Introduction:\n" + sentence +
+                                "\n\nExplanation:\nThis concept is important because it supports the main theme of the PDF and helps in understanding the topic clearly." +
+                                "\n\nConclusion:\nIt should be revised as an important exam point."
+                ));
+            }
+
+            if (i < 2) {
+                tenMark.add(Map.of(
+                        "question", "Discuss the topic explained in the PDF in detail.",
+                        "answer", "Introduction:\n" + sentence +
+                                "\n\nMain Explanation:\nThe PDF explains this idea as an important part of the topic. It should be understood with its meaning, purpose, and practical importance." +
+                                "\n\nKey Points:\n• Understand the core idea\n• Learn the related explanation\n• Revise it before exams\n\nConclusion:\nThis topic is useful for both short and long answer preparation."
+                ));
+            }
+        }
+
+        subjective.put("one_mark", oneMark);
+        subjective.put("three_mark", threeMark);
+        subjective.put("five_mark", fiveMark);
+        subjective.put("ten_mark", tenMark);
+
+        List<Map<String, Object>> cheatSheet = new ArrayList<>();
+
+        for (int i = 0; i < Math.min(6, sentences.size()); i++) {
+            cheatSheet.add(Map.of(
+                    "title", "Important Point " + (i + 1),
+                    "points", List.of(sentences.get(i))
+            ));
+        }
+
+        response.put("objective", objective);
+        response.put("subjective", subjective);
+        response.put("cheat_sheet", cheatSheet);
+        response.put("mode", "pdf_fallback");
+
         return response;
     }
 
