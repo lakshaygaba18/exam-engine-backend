@@ -34,10 +34,19 @@ public class FileUploadController {
 
     @PostMapping("/upload")
     private String extractTopic(String sentence) {
+
+        if (sentence == null || sentence.trim().isEmpty()) {
+            return "the topic";
+        }
+
         String cleaned = sentence
                 .replaceAll("[^a-zA-Z0-9 ]", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
+
+        if (cleaned.isEmpty()) {
+            return "the topic";
+        }
 
         String[] words = cleaned.split(" ");
 
@@ -63,7 +72,9 @@ public class FileUploadController {
             return words[0] + " " + words[1] + " " + words[2];
         }
 
-        return cleaned.length() > 25 ? cleaned.substring(0, 25) : cleaned;
+        return cleaned.length() > 25
+                ? cleaned.substring(0, 25)
+                : cleaned;
     }
 
     private String generateVivaQuestion(String sentence) {
