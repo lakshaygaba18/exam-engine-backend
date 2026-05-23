@@ -240,12 +240,14 @@ public class FileUploadController {
         List<Map<String, Object>> cheatSheet = new ArrayList<>();
 
         for (int i = 0; i < Math.min(8, important.size()); i++) {
+            String topic = extractTopic(important.get(i));
+
             cheatSheet.add(Map.of(
-                    "title", "Important Point " + (i + 1),
+                    "title", topic,
                     "points", List.of(
                             important.get(i),
-                            "Revise this point before exam.",
-                            "Can be used in short or long answers."
+                            "Focus on the meaning and importance of " + topic + ".",
+                            "This can be revised quickly before exams."
                     )
             ));
         }
