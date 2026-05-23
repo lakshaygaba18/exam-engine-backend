@@ -123,33 +123,42 @@ public class FileUploadController {
 
         List<String> important = sentences.stream()
                 .filter(s -> {
+
                     String x = s.toLowerCase();
-                    return x.contains("important") ||
-                            x.contains("means") ||
-                            x.contains("defined") ||
-                            x.contains("helps") ||
-                            x.contains("because") ||
-                            x.contains("process") ||
-                            x.contains("method") ||
-                            x.contains("benefit") ||
-                            x.contains("role") ||
-                            x.contains("practice") ||
-                            x.contains("focus") ||
-                            x.contains("mind") ||
-                            x.contains("body") ||
-                            x.contains("effect") ||
-                            x.contains("cause") ||
-                            x.contains("improve") ||
-                            x.contains("reduce") ||
-                            x.contains("increase") ||
-                            x.contains("control") ||
-                            x.contains("attention") ||
-                            x.contains("stress") ||
-                            x.contains("health") ||
-                            x.contains("learning") ||
-                            x.contains("memory") ||
-                            x.contains("example");
+
+                    return
+
+                            x.contains("is") ||
+                                    x.contains("are") ||
+                                    x.contains("means") ||
+                                    x.contains("defined") ||
+                                    x.contains("refers") ||
+
+                                    x.contains("important") ||
+                                    x.contains("benefit") ||
+                                    x.contains("advantage") ||
+                                    x.contains("effect") ||
+                                    x.contains("cause") ||
+
+                                    x.contains("improve") ||
+                                    x.contains("increase") ||
+                                    x.contains("reduce") ||
+                                    x.contains("control") ||
+
+                                    x.contains("process") ||
+                                    x.contains("method") ||
+                                    x.contains("technique") ||
+                                    x.contains("system") ||
+
+                                    x.contains("health") ||
+                                    x.contains("stress") ||
+                                    x.contains("focus") ||
+                                    x.contains("memory") ||
+                                    x.contains("learning");
+
                 })
+                .distinct()
+                .limit(20)
                 .toList();
 
         if (important.size() < 8) {
