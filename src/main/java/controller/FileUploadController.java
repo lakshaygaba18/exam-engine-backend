@@ -214,9 +214,9 @@ public class FileUploadController {
                         "answer",
                         "Definition:\n" + point + "\n\n" +
                                 "Key Points:\n" +
-                                "• Important concept from the PDF\n" +
-                                "• Helps understand the topic clearly\n" +
-                                "• Useful for exam preparation"
+                                "• It explains an important part of the uploaded material\n" +
+                                "• Helps in understanding the topic clearly\n" +
+                                "• Useful for short-answer exam preparation"
                 ));
             }
 
@@ -225,18 +225,14 @@ public class FileUploadController {
                         "question", generateFiveMarkQuestion(point),
                         "answer",
                         "Introduction:\n" + point + "\n\n" +
-
                                 "Explanation:\n" +
-                                "This concept is discussed as an important part of the topic. " +
-                                "It helps in understanding the overall subject clearly and can be used in descriptive answers.\n\n" +
-
-                                "Key Points:\n" +
-                                "• Important for conceptual understanding\n" +
-                                "• Related to the main topic of the PDF\n" +
-                                "• Useful for revision and exam writing\n\n" +
-
+                                "This point is connected to the main topic of the PDF. It should be explained clearly with its meaning and purpose.\n\n" +
+                                "Exam Relevance:\n" +
+                                "• Helps in writing descriptive answers\n" +
+                                "• Useful for quick revision\n" +
+                                "• Can be expanded with examples if required\n\n" +
                                 "Conclusion:\n" +
-                                "This topic should be revised carefully before exams."
+                                "This concept should be revised as an important exam point."
                 ));
             }
 
@@ -245,20 +241,15 @@ public class FileUploadController {
                         "question", generateTenMarkQuestion(point),
                         "answer",
                         "Introduction:\n" + point + "\n\n" +
-
                                 "Detailed Explanation:\n" +
-                                "The PDF explains this concept as an important topic. " +
-                                "It should be understood along with its meaning, applications, and practical importance. " +
-                                "Students should write the answer in a structured format during exams.\n\n" +
-
+                                "This topic should be explained in a structured way. Start with the meaning, then describe its role, importance, and related points from the PDF.\n\n" +
                                 "Important Points:\n" +
-                                "• Understand the core concept\n" +
-                                "• Learn supporting explanations\n" +
-                                "• Revise examples and applications\n" +
-                                "• Practice writing descriptive answers\n\n" +
-
+                                "• Mention the core idea clearly\n" +
+                                "• Explain why it matters\n" +
+                                "• Add related points from the PDF\n" +
+                                "• End with a short conclusion\n\n" +
                                 "Conclusion:\n" +
-                                "This is an important topic for long-answer preparation and revision."
+                                "This topic is suitable for long-answer preparation and last-minute revision."
                 ));
             }
         }
