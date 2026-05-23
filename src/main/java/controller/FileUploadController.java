@@ -262,7 +262,6 @@ public class FileUploadController {
         List<Map<String, Object>> cheatSheet = new ArrayList<>();
 
         for (int i = 0; i < Math.min(8, important.size()); i++) {
-            String topic = extractTopic(important.get(i));
 
             String topic = extractTopic(important.get(i));
 
