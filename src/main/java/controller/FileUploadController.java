@@ -309,19 +309,33 @@ public class FileUploadController {
                 "for", "you", "your", "its", "our", "they", "them"
         );
 
+        List<String> selected = new ArrayList<>();
+
         for (String word : words) {
+
             String lower = word.toLowerCase();
 
-            if (word.length() > 5 && !stopWords.contains(lower)) {
-                return word;
+            if (
+                    word.length() > 4 &&
+                            !stopWords.contains(lower) &&
+                            Character.isLetter(word.charAt(0))
+            ) {
+                selected.add(
+                        word.substring(0, 1).toUpperCase() +
+                                word.substring(1).toLowerCase()
+                );
+            }
+
+            if (selected.size() == 2) {
+                break;
             }
         }
 
-        if (words.length >= 3) {
-            return words[0] + " " + words[1] + " " + words[2];
+        if (!selected.isEmpty()) {
+            return String.join(" ", selected);
         }
 
-        return cleaned.length() > 25 ? cleaned.substring(0, 25) : cleaned;
+        return "the topic";
     }
 
     private String generateVivaQuestion(String sentence) {
