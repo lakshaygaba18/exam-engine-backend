@@ -338,29 +338,70 @@ public class FileUploadController {
         return "the topic";
     }
 
+    private final List<String> vivaStarters = List.of(
+            "What does the PDF explain about ",
+            "Why is ",
+            "How is ",
+            "What are the benefits of ",
+            "Explain the concept of "
+    );
+
+    private final List<String> oneMarkStarters = List.of(
+            "Define ",
+            "State one key point about ",
+            "What is ",
+            "Write a short note on "
+    );
+
+    private final List<String> threeMarkStarters = List.of(
+            "Explain ",
+            "How does ",
+            "Why is ",
+            "Discuss briefly "
+    );
+
+    private final List<String> fiveMarkStarters = List.of(
+            "Explain the importance of ",
+            "Discuss the role of ",
+            "How does ",
+            "Explain "
+    );
+
+    private final List<String> tenMarkStarters = List.of(
+            "Discuss ",
+            "Explain in detail ",
+            "Write detailed notes on ",
+            "Describe the importance of "
+    );
+
+    private String randomStarter(List<String> list, String topic) {
+        int index = Math.abs(topic.hashCode()) % list.size();
+        return list.get(index) + topic;
+    }
+
     private String generateVivaQuestion(String sentence) {
         String topic = extractTopic(sentence);
-        return "What does the PDF explain about " + topic + "?";
+        return randomStarter(vivaStarters, topic) + "?";
     }
 
     private String generateOneMarkQuestion(String sentence) {
         String topic = extractTopic(sentence);
-        return "State one key point about " + topic + ".";
+        return randomStarter(oneMarkStarters, topic) + ".";
     }
 
     private String generateThreeMarkQuestion(String sentence) {
         String topic = extractTopic(sentence);
-        return "Explain " + topic + " briefly.";
+        return randomStarter(threeMarkStarters, topic) + "?";
     }
 
     private String generateFiveMarkQuestion(String sentence) {
         String topic = extractTopic(sentence);
-        return "Explain the importance of " + topic + ".";
+        return randomStarter(fiveMarkStarters, topic) + "?";
     }
 
     private String generateTenMarkQuestion(String sentence) {
         String topic = extractTopic(sentence);
-        return "Discuss " + topic + " in detail with key points.";
+        return randomStarter(tenMarkStarters, topic) + " in detail.";
     }
 
     private String sha256(String input) throws Exception {
