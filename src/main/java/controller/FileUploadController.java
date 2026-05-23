@@ -136,7 +136,19 @@ public class FileUploadController {
                             x.contains("practice") ||
                             x.contains("focus") ||
                             x.contains("mind") ||
-                            x.contains("body");
+                            x.contains("body") ||
+                            x.contains("effect") ||
+                            x.contains("cause") ||
+                            x.contains("improve") ||
+                            x.contains("reduce") ||
+                            x.contains("increase") ||
+                            x.contains("control") ||
+                            x.contains("attention") ||
+                            x.contains("stress") ||
+                            x.contains("health") ||
+                            x.contains("learning") ||
+                            x.contains("memory") ||
+                            x.contains("example");
                 })
                 .toList();
 
