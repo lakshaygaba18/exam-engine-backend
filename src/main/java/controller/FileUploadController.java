@@ -181,9 +181,11 @@ public class FileUploadController {
                 threeMark.add(Map.of(
                         "question", generateThreeMarkQuestion(point),
                         "answer",
-                        "• " + point + "\n" +
-                                "• This point is important for understanding the topic.\n" +
-                                "• It can be revised as a short-answer exam point."
+                        "Definition:\n" + point + "\n\n" +
+                                "Key Points:\n" +
+                                "• Important concept from the PDF\n" +
+                                "• Helps understand the topic clearly\n" +
+                                "• Useful for exam preparation"
                 ));
             }
 
@@ -192,8 +194,18 @@ public class FileUploadController {
                         "question", generateFiveMarkQuestion(point),
                         "answer",
                         "Introduction:\n" + point + "\n\n" +
-                                "Explanation:\nThis concept supports the main theme of the PDF and helps in understanding the topic clearly.\n\n" +
-                                "Conclusion:\nThis point should be revised as an important exam point."
+
+                                "Explanation:\n" +
+                                "This concept is discussed as an important part of the topic. " +
+                                "It helps in understanding the overall subject clearly and can be used in descriptive answers.\n\n" +
+
+                                "Key Points:\n" +
+                                "• Important for conceptual understanding\n" +
+                                "• Related to the main topic of the PDF\n" +
+                                "• Useful for revision and exam writing\n\n" +
+
+                                "Conclusion:\n" +
+                                "This topic should be revised carefully before exams."
                 ));
             }
 
@@ -202,13 +214,20 @@ public class FileUploadController {
                         "question", generateTenMarkQuestion(point),
                         "answer",
                         "Introduction:\n" + point + "\n\n" +
-                                "Detailed Explanation:\nThe PDF presents this as an important idea. It should be understood with its meaning, purpose, and practical importance.\n\n" +
-                                "Key Points:\n" +
-                                "• Understand the core meaning\n" +
-                                "• Explain why it is important\n" +
-                                "• Add supporting points from the PDF\n" +
-                                "• Write the answer in a structured way\n\n" +
-                                "Conclusion:\nThis topic is useful for both short-answer and long-answer preparation."
+
+                                "Detailed Explanation:\n" +
+                                "The PDF explains this concept as an important topic. " +
+                                "It should be understood along with its meaning, applications, and practical importance. " +
+                                "Students should write the answer in a structured format during exams.\n\n" +
+
+                                "Important Points:\n" +
+                                "• Understand the core concept\n" +
+                                "• Learn supporting explanations\n" +
+                                "• Revise examples and applications\n" +
+                                "• Practice writing descriptive answers\n\n" +
+
+                                "Conclusion:\n" +
+                                "This is an important topic for long-answer preparation and revision."
                 ));
             }
         }
