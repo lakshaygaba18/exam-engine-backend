@@ -264,12 +264,20 @@ public class FileUploadController {
         for (int i = 0; i < Math.min(8, important.size()); i++) {
             String topic = extractTopic(important.get(i));
 
+            String topic = extractTopic(important.get(i));
+
+            String shortPoint = important.get(i);
+
+            if (shortPoint.length() > 140) {
+                shortPoint = shortPoint.substring(0, 140) + "...";
+            }
+
             cheatSheet.add(Map.of(
                     "title", topic,
                     "points", List.of(
-                            important.get(i),
-                            "Focus on the meaning and importance of " + topic + ".",
-                            "This can be revised quickly before exams."
+                            shortPoint,
+                            "Focus on the core meaning of " + topic + ".",
+                            "Revise this topic before exams."
                     )
             ));
         }
