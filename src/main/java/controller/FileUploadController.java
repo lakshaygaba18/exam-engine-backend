@@ -410,39 +410,39 @@ public class FileUploadController {
     }
 
     private final List<String> vivaStarters = List.of(
+            "What is ",
             "What does the PDF explain about ",
             "Why is ",
-            "How is ",
-            "What are the benefits of ",
-            "Explain the concept of "
+            "How does ",
+            "What is the role of "
     );
 
     private final List<String> oneMarkStarters = List.of(
             "Define ",
-            "State one key point about ",
+            "State one point about ",
             "What is ",
-            "Write a short note on "
+            "Name the key idea of "
     );
 
     private final List<String> threeMarkStarters = List.of(
             "Explain ",
-            "How does ",
+            "Write short notes on ",
             "Why is ",
-            "Discuss briefly "
+            "How does "
     );
 
     private final List<String> fiveMarkStarters = List.of(
             "Explain the importance of ",
             "Discuss the role of ",
-            "How does ",
-            "Explain "
+            "Describe ",
+            "Explain the benefits of "
     );
 
     private final List<String> tenMarkStarters = List.of(
             "Discuss ",
             "Explain in detail ",
             "Write detailed notes on ",
-            "Describe the importance of "
+            "Describe the significance of "
     );
 
     private String randomStarter(List<String> list, String topic) {
