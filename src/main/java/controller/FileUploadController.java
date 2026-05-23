@@ -108,6 +108,7 @@ public class FileUploadController {
 
         Map<String, Object> response = new HashMap<>();
 
+        List<String> headings = extractHeadings(text);
         List<String> sentences = Arrays.stream(text.split("[.!?\\n]"))
                 .map(String::trim)
                 .map(s -> s.replaceAll("\\s+", " "))
@@ -163,6 +164,12 @@ public class FileUploadController {
 
         if (important.size() < 8) {
             important = sentences;
+        }
+        if (!headings.isEmpty()) {
+            List<String> mixed = new ArrayList<>();
+            mixed.addAll(headings);
+            mixed.addAll(important);
+            important = mixed.stream().distinct().limit(25).toList();
         }
 
         List<Map<String, String>> viva = new ArrayList<>();
@@ -349,6 +356,38 @@ public class FileUploadController {
         }
 
         return digitCount > s.length() / 3;
+    }
+    private List<String> extractHeadings(String text) {
+
+        if (text == null || text.isBlank()) {
+            return new ArrayList<>();
+        }
+
+        List<String> headings = new ArrayList<>();
+
+        String[] lines = text.split("\\n");
+
+        for (String line : lines) {
+
+            String cleaned = line
+                    .replaceAll("[^a-zA-Z0-9 ]", " ")
+                    .replaceAll("\\s+", " ")
+                    .trim();
+
+            if (cleaned.length() >= 4 &&
+                    cleaned.length() <= 60 &&
+                    cleaned.split(" ").length <= 6 &&
+                    !isJunkLine(cleaned)) {
+
+                headings.add(cleaned);
+            }
+
+            if (headings.size() >= 10) {
+                break;
+            }
+        }
+
+        return headings;
     }
     private String extractTopic(String sentence) {
 
