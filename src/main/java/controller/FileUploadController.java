@@ -157,9 +157,21 @@ public class FileUploadController {
         }
 
         List<Map<String, String>> viva = new ArrayList<>();
+        Set<String> usedTopics = new HashSet<>();
 
-        for (int i = 0; i < Math.min(10, important.size()); i++) {
-            String point = important.get(i);
+        for (String point : important) {
+            if (viva.size() >= 10) {
+                break;
+            }
+
+            String topic = extractTopic(point).toLowerCase();
+
+            if (usedTopics.contains(topic)) {
+                continue;
+            }
+
+            usedTopics.add(topic);
+
             viva.add(Map.of(
                     "question", generateVivaQuestion(point),
                     "answer", point
