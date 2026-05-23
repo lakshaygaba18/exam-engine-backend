@@ -376,13 +376,14 @@ public class FileUploadController {
                 "have", "has", "had", "can", "will", "shall", "should",
                 "would", "could", "also", "more", "most", "very", "their",
                 "there", "then", "than", "been", "being", "such", "only",
-                "for", "you", "your", "its", "our", "they", "them"
+                "for", "you", "your", "its", "our", "they", "them", "using",
+                "used", "make", "makes", "made", "help", "helps", "important",
+                "concept", "topic", "chapter", "point", "points", "pdf"
         );
 
         List<String> selected = new ArrayList<>();
 
         for (String word : words) {
-
             String lower = word.toLowerCase();
 
             if (
@@ -396,7 +397,7 @@ public class FileUploadController {
                 );
             }
 
-            if (selected.size() == 2) {
+            if (selected.size() == 3) {
                 break;
             }
         }
