@@ -377,7 +377,10 @@ public class FileUploadController {
             if (cleaned.length() >= 4 &&
                     cleaned.length() <= 60 &&
                     cleaned.split(" ").length <= 6 &&
-                    !isJunkLine(cleaned)) {
+                    !isJunkLine(cleaned) &&
+                    !cleaned.toLowerCase().startsWith("unit") &&
+                    !cleaned.toLowerCase().startsWith("page") &&
+                    !cleaned.toLowerCase().startsWith("chapter")) {
 
                 headings.add(cleaned);
             }
