@@ -380,7 +380,8 @@ public class FileUploadController {
                     !isJunkLine(cleaned) &&
                     !cleaned.toLowerCase().startsWith("unit") &&
                     !cleaned.toLowerCase().startsWith("page") &&
-                    !cleaned.toLowerCase().startsWith("chapter")) {
+                    !cleaned.toLowerCase().startsWith("chapter") &&
+                    !cleaned.matches(".*\\d{2,}.*")) {
 
                 headings.add(cleaned);
             }
