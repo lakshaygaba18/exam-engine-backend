@@ -108,15 +108,13 @@ public class FileUploadController {
 
         Map<String, Object> response = new HashMap<>();
 
-        List<String> sentences = Arrays.stream(text.split("[.!?]"))
+        List<String> sentences = Arrays.stream(text.split("[.!?\\n]"))
                 .map(String::trim)
                 .map(s -> s.replaceAll("\\s+", " "))
-                .filter(s -> s.length() > 35 && s.length() < 260)
-                .filter(s -> !s.toLowerCase().contains("copyright"))
-                .filter(s -> !s.toLowerCase().contains("www"))
-                .filter(s -> !s.toLowerCase().contains("http"))
+                .filter(s -> s.length() > 45 && s.length() < 260)
+                .filter(s -> !isJunkLine(s))
                 .distinct()
-                .limit(30)
+                .limit(45)
                 .toList();
 
         if (sentences.isEmpty()) {
@@ -302,7 +300,25 @@ public class FileUploadController {
 
         return response;
     }
+    private boolean isJunkLine(String s) {
+        if (s == null || s.isBlank()) return true;
 
+        String x = s.toLowerCase();
+
+        if (x.contains("copyright")) return true;
+        if (x.contains("www")) return true;
+        if (x.contains("http")) return true;
+        if (x.contains("page")) return true;
+        if (x.contains("figure")) return true;
+        if (x.contains("table")) return true;
+
+        int digitCount = 0;
+        for (char c : s.toCharArray()) {
+            if (Character.isDigit(c)) digitCount++;
+        }
+
+        return digitCount > s.length() / 3;
+    }
     private String extractTopic(String sentence) {
 
         if (sentence == null || sentence.trim().isEmpty()) {
