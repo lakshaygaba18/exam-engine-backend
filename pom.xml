@@ -59,6 +59,27 @@
 			<artifactId>jackson-databind</artifactId>
 			<version>2.17.1</version>
 		</dependency>
+		<!-- DOCX support -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.3</version>
+        </dependency>
+
+        <!-- PPTX support (included in poi-ooxml but explicit for clarity) -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+            <version>5.2.3</version>
+        </dependency>
+
+        <!-- Required XML schema for POI -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-scratchpad</artifactId>
+            <version>5.2.3</version>
+        </dependency>
+
 
 	</dependencies>
 
