@@ -230,20 +230,20 @@ public class FileUploadController {
             subjective.put("ten_mark",    generateQuestions(topics, tenMarkCount,   10));
 
             // ================= BUILD CHEAT SHEET =================
-            List<Map<String, Object>> cheat = new ArrayList<>();
+           // ================= BUILD CHEAT SHEET =================
+List<Map<String, Object>> cheat = new ArrayList<>();
 
-            for (int i = 0; i < Math.min(12, topics.size()); i++) {
-                String t = topics.get(i);
-                cheat.add(Map.of(
-                        "title", shortTopic(t),
-                        "points", List.of(
-                                "Important topic for exams",
-                                "Conceptually important",
-                                "Frequently asked"
-                        )
-                ));
-            }
-
+for (int i = 0; i < Math.min(20, topics.size()); i++) {
+    String t = topics.get(i).trim();
+    String topicName = extractTopicName(t);
+    String summary = extractSummary(t);
+    if (!topicName.isBlank() && !summary.isBlank()) {
+        cheat.add(Map.of(
+                "topic", topicName,
+                "summary", summary
+        ));
+    }
+}
             // ================= BUILD RESPONSE =================
             Map<String, Object> response = new HashMap<>();
             response.put("objective",   Map.of("viva", viva));
@@ -290,28 +290,83 @@ public class FileUploadController {
     }
 
     private String generateAnswer(String text, int mark) {
-        String cleaned = text.replaceAll("\\s+", " ").trim();
+    String cleaned = text.replaceAll("\\s+", " ").trim();
 
-        if (mark == 1)
-            return shorten(cleaned, 120);
-
-        if (mark == 3)
-            return "Definition:\n" + shorten(cleaned, 150) +
-                    "\n\nKey Points:\n• Important concept\n• Exam relevant";
-
-        if (mark == 5)
-            return "Intro:\n" + shorten(cleaned, 180) +
-                    "\n\nExplanation:\n• Key concept\n• Important for exams";
-
-        return "Detailed Explanation:\n" + shorten(cleaned, 250) +
-                "\n\nKey Points:\n• Important topic\n• Frequently asked";
+    if (mark == 1) {
+        return shorten(cleaned, 100);
     }
+
+    if (mark == 3) {
+        return "Definition: " + shorten(cleaned, 150) + "\n\n" +
+               "Key Points:\n" +
+               "• " + extractKeyPoint(cleaned, 0) + "\n" +
+               "• " + extractKeyPoint(cleaned, 1);
+    }
+
+    if (mark == 5) {
+        return "Introduction:\n" + shorten(cleaned, 180) + "\n\n" +
+               "Explanation:\n" + expandText(cleaned, 200) + "\n\n" +
+               "Key Points:\n" +
+               "• " + extractKeyPoint(cleaned, 0) + "\n" +
+               "• " + extractKeyPoint(cleaned, 1) + "\n" +
+               "• " + extractKeyPoint(cleaned, 2);
+    }
+
+    return "Introduction:\n" + shorten(cleaned, 180) + "\n\n" +
+           "Detailed Explanation:\n" + expandText(cleaned, 250) + "\n\n" +
+           "Important Points:\n" +
+           "• " + extractKeyPoint(cleaned, 0) + "\n" +
+           "• " + extractKeyPoint(cleaned, 1) + "\n" +
+           "• " + extractKeyPoint(cleaned, 2) + "\n" +
+           "• " + extractKeyPoint(cleaned, 3) + "\n\n" +
+           "Conclusion:\n" + shorten(cleaned, 120);
+}
 
     private String shortTopic(String text) {
         String[] w = text.replaceAll("[^a-zA-Z0-9 ]", "").trim().split("\\s+");
         return String.join(" ", Arrays.copyOf(w, Math.min(6, w.length)));
     }
+    
+    private String extractTopicName(String sentence) {
+    String cleaned = sentence.replaceAll("[^a-zA-Z0-9 ]", " ").trim();
+    String[] words = cleaned.split("\\s+");
+    Set<String> skip = new HashSet<>(Arrays.asList(
+        "a", "an", "the", "is", "are", "was", "were",
+        "of", "in", "on", "at", "to", "for", "and", "or"
+    ));
+    List<String> meaningful = new ArrayList<>();
+    for (String w : words) {
+        if (w.length() > 2 && !skip.contains(w.toLowerCase())) {
+            meaningful.add(w);
+        }
+        if (meaningful.size() == 5) break;
+    }
+    return String.join(" ", meaningful);
+}
 
+private String extractSummary(String sentence) {
+    String cleaned = sentence.replaceAll("\\s+", " ").trim();
+    if (cleaned.length() <= 120) return cleaned;
+    String cut = cleaned.substring(0, 120);
+    int lastSpace = cut.lastIndexOf(' ');
+    return lastSpace > 60 ? cut.substring(0, lastSpace) + "..." : cut + "...";
+}
+
+private String extractKeyPoint(String text, int index) {
+    String[] words = text.split("\\s+");
+    int chunkSize = Math.max(8, words.length / 4);
+    int start = Math.min(index * chunkSize, Math.max(0, words.length - chunkSize));
+    int end = Math.min(start + chunkSize, words.length);
+    String[] chunk = Arrays.copyOfRange(words, start, end);
+    String point = String.join(" ", chunk).replaceAll("[^a-zA-Z0-9 ,.]", "").trim();
+    return point.isEmpty() ? "Refer to notes for details" : shorten(point, 80);
+}
+
+private String expandText(String text, int maxLen) {
+    String cleaned = text.replaceAll("\\s+", " ").trim();
+    if (cleaned.length() >= maxLen) return shorten(cleaned, maxLen);
+    return cleaned + " This concept is fundamental to understanding the subject.";
+}
     private String shorten(String s, int l) {
         return s.length() <= l ? s : s.substring(0, l) + "...";
     }
