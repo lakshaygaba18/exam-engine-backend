@@ -21,7 +21,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/file")
@@ -31,6 +33,9 @@ public class FileUploadController {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newHttpClient();
+
+    // ================= IN-MEMORY CACHE =================
+    private static final Map<String, Map<String, Object>> responseCache = new ConcurrentHashMap<>();
 
     @GetMapping("/test")
     public String test() {
@@ -120,6 +125,18 @@ public class FileUploadController {
 
             System.out.println("File: " + originalName + " | Text length: " + text.length() + " | Pages: " + totalPages);
 
+            // ================= CACHE CHECK =================
+            String cacheKey = getMD5(text);
+
+            if (cacheKey != null && responseCache.containsKey(cacheKey)) {
+                System.out.println("Cache HIT for: " + originalName);
+                Map<String, Object> cached = new HashMap<>(responseCache.get(cacheKey));
+                cached.put("pages", totalPages);
+                return cached;
+            }
+
+            System.out.println("Cache MISS for: " + originalName);
+
             // ================= QUESTION COUNT BY PAGE SIZE =================
             int vivaCount      = 15;
             int oneMarkCount   = 10;
@@ -161,6 +178,12 @@ public class FileUploadController {
                 return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
             }
 
+            // ================= STORE IN CACHE =================
+            if (cacheKey != null) {
+                responseCache.put(cacheKey, new HashMap<>(parsed));
+                System.out.println("Cached result for: " + originalName);
+            }
+
             parsed.put("pages", totalPages);
             return parsed;
 
@@ -180,19 +203,20 @@ public class FileUploadController {
             "- Viva questions: single sentence answer, max 2 lines, direct and to the point\n" +
             "- 1 mark questions: 2-3 lines max, crisp definition or fact\n" +
             "- 3 mark questions: vary the answer format based on question type:\n" +
-"  * If 'difference/compare/distinguish' → use a comparison table or 2 column bullet points\n" +
-"  * If 'list/state/mention' → use exactly 3 bullet points, each 1 line\n" +
-"  * If 'explain/describe/write note' → write a short note of 4-5 lines as a paragraph\n" +
-"  * If 'define' → give definition + 2 key points\n" +
+            "  * If 'difference/compare/distinguish' -> use comparison bullet points showing both sides\n" +
+            "  * If 'list/state/mention' -> use exactly 3 bullet points, each 1 line\n" +
+            "  * If 'explain/describe/write note' -> write a short note of 4-5 lines as a paragraph\n" +
+            "  * If 'define' -> give definition + 2 key points\n" +
             "- 5 mark questions: 10-15 lines, include definition + explanation + bullet points + example\n" +
             "- 10 mark questions: detailed answer with definition, explanation, bullet points, advantages/disadvantages, applications\n" +
-           "- Cheat sheet: for each entry provide:\n" +
-"  * topic: short topic name (3-5 words)\n" +
-"  * summary: 2-3 lines covering the most important fact, formula, or definition\n" +
-"  * If the topic has a formula → include it in summary\n" +
-"  * If the topic has a important date or number → include it\n" +
-"  * If the topic is a process → give steps in 1 line each\n" +
-"  * Write like a student's last-minute revision note, not a textbook\n" +
+            "- For 3, 5 and 10 mark questions, add an 'important' field: true if the topic is a core concept, frequently examined, or appears multiple times in notes. false otherwise.\n" +
+            "- Cheat sheet: for each entry provide:\n" +
+            "  * topic: short topic name (3-5 words)\n" +
+            "  * summary: 2-3 lines covering the most important fact, formula, or definition\n" +
+            "  * If the topic has a formula -> include it in summary\n" +
+            "  * If the topic has an important date or number -> include it\n" +
+            "  * If the topic is a process -> give steps in 1 line each\n" +
+            "  * Write like a student's last-minute revision note, not a textbook\n" +
             "- Only generate questions from the actual content provided\n" +
             "- Do not add any text before or after the JSON\n\n" +
             "Generate exactly:\n" +
@@ -211,9 +235,9 @@ public class FileUploadController {
             "  },\n" +
             "  \"subjective\": {\n" +
             "    \"one_mark\": [{\"question\": \"...\", \"answer\": \"...\"}],\n" +
-            "    \"three_mark\": [{\"question\": \"...\", \"answer\": \"...\"}],\n" +
-            "    \"five_mark\": [{\"question\": \"...\", \"answer\": \"...\"}],\n" +
-            "    \"ten_mark\": [{\"question\": \"...\", \"answer\": \"...\"}]\n" +
+            "    \"three_mark\": [{\"question\": \"...\", \"answer\": \"...\", \"important\": true}],\n" +
+            "    \"five_mark\": [{\"question\": \"...\", \"answer\": \"...\", \"important\": true}],\n" +
+            "    \"ten_mark\": [{\"question\": \"...\", \"answer\": \"...\", \"important\": true}]\n" +
             "  },\n" +
             "  \"cheat_sheet\": [\n" +
             "    {\"topic\": \"...\", \"summary\": \"...\"}\n" +
@@ -296,6 +320,21 @@ public class FileUploadController {
         }
     }
 
+    // ================= MD5 HASH FOR CACHE KEY =================
+    private String getMD5(String text) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] hash = md.digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     // ================= FALLBACK (rule-based) =================
     private Map<String, Object> fallbackGeneration(String text, int totalPages,
             int vivaCount, int oneMarkCount, int threeMarkCount,
@@ -353,7 +392,7 @@ public class FileUploadController {
         subjective.put("ten_mark",    generateQuestions(topics, tenMarkCount,   10));
 
         List<Map<String, Object>> cheat = new ArrayList<>();
-        for (int i = 0; i < Math.min(20, topics.size()); i++) {
+        for (int i = 0; i < Math.min(15, topics.size()); i++) {
             String t = topics.get(i).trim();
             String topicName = extractTopicName(t);
             String summary = extractSummary(t);
