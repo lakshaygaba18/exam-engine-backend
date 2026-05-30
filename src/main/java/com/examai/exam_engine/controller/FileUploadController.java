@@ -186,7 +186,13 @@ public class FileUploadController {
 "  * If 'define' → give definition + 2 key points\n" +
             "- 5 mark questions: 10-15 lines, include definition + explanation + bullet points + example\n" +
             "- 10 mark questions: detailed answer with definition, explanation, bullet points, advantages/disadvantages, applications\n" +
-            "- Cheat sheet: topic name + 1 line memory trigger (formula, key fact, or definition)\n" +
+           "- Cheat sheet: for each entry provide:\n" +
+"  * topic: short topic name (3-5 words)\n" +
+"  * summary: 2-3 lines covering the most important fact, formula, or definition\n" +
+"  * If the topic has a formula → include it in summary\n" +
+"  * If the topic has a important date or number → include it\n" +
+"  * If the topic is a process → give steps in 1 line each\n" +
+"  * Write like a student's last-minute revision note, not a textbook\n" +
             "- Only generate questions from the actual content provided\n" +
             "- Do not add any text before or after the JSON\n\n" +
             "Generate exactly:\n" +
@@ -195,7 +201,7 @@ public class FileUploadController {
             "- %d three mark questions\n" +
             "- %d five mark questions\n" +
             "- %d ten mark questions\n" +
-            "- 10 cheat sheet entries\n\n" +
+            "- 15 cheat sheet entries\n\n" +
             "Return ONLY this JSON structure, nothing else:\n" +
             "{\n" +
             "  \"objective\": {\n" +
