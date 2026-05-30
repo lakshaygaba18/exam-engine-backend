@@ -151,11 +151,7 @@ if (aiResponse == null) {
     System.out.println("OpenAI call failed, falling back");
     return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
 }
-Map<String, Object> parsed = parseGeminiResponse(aiResponse);
-if (parsed == null) {
-    System.out.println("OpenAI response parse failed, falling back");
-    return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
-}
+
 
             // ================= PARSE GEMINI RESPONSE =================
             Map<String, Object> parsed = parseGeminiResponse(geminiResponse);
