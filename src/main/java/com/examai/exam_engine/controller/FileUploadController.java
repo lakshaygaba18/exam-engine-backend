@@ -179,7 +179,11 @@ public class FileUploadController {
             "RULES:\n" +
             "- Viva questions: single sentence answer, max 2 lines, direct and to the point\n" +
             "- 1 mark questions: 2-3 lines max, crisp definition or fact\n" +
-            "- 3 mark questions: exactly 3 bullet points, each 1 line, key differences or steps\n" +
+            "- 3 mark questions: vary the answer format based on question type:\n" +
+"  * If 'difference/compare/distinguish' → use a comparison table or 2 column bullet points\n" +
+"  * If 'list/state/mention' → use exactly 3 bullet points, each 1 line\n" +
+"  * If 'explain/describe/write note' → write a short note of 4-5 lines as a paragraph\n" +
+"  * If 'define' → give definition + 2 key points\n" +
             "- 5 mark questions: 10-15 lines, include definition + explanation + bullet points + example\n" +
             "- 10 mark questions: detailed answer with definition, explanation, bullet points, advantages/disadvantages, applications\n" +
             "- Cheat sheet: topic name + 1 line memory trigger (formula, key fact, or definition)\n" +
