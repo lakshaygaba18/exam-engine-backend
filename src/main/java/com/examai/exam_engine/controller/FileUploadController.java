@@ -27,9 +27,8 @@ import java.util.*;
 @RequestMapping("/file")
 public class FileUploadController {
 
-    private static final String GEMINI_URL =
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=";
-
+    private static final String OPENAI_URL =
+    "https://api.openai.com/v1/chat/completions";
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -141,20 +140,22 @@ public class FileUploadController {
             }
 
             // ================= GEMINI AI CALL =================
-            String apiKey = System.getenv("GEMINI_API_KEY");
-
-            if (apiKey == null || apiKey.isBlank()) {
-                System.out.println("GEMINI_API_KEY not set, falling back to rule-based generation");
-                return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
-            }
-
-            String prompt = buildPrompt(text, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount);
-            String geminiResponse = callGemini(apiKey, prompt);
-
-            if (geminiResponse == null) {
-                System.out.println("Gemini call failed, falling back to rule-based generation");
-                return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
-            }
+           String apiKey = System.getenv("OPENAI_API_KEY");
+if (apiKey == null || apiKey.isBlank()) {
+    System.out.println("OPENAI_API_KEY not set, falling back to rule-based generation");
+    return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
+}
+String prompt = buildPrompt(text, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount);
+String aiResponse = callOpenAI(apiKey, prompt);
+if (aiResponse == null) {
+    System.out.println("OpenAI call failed, falling back");
+    return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
+}
+Map<String, Object> parsed = parseGeminiResponse(aiResponse);
+if (parsed == null) {
+    System.out.println("OpenAI response parse failed, falling back");
+    return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
+}
 
             // ================= PARSE GEMINI RESPONSE =================
             Map<String, Object> parsed = parseGeminiResponse(geminiResponse);
@@ -223,62 +224,58 @@ public class FileUploadController {
     }
 
     // ================= CALL GEMINI API =================
-    private String callGemini(String apiKey, String prompt) {
-        try {
-            String requestBody = String.format("""
+    private String callOpenAI(String apiKey, String prompt) {
+    try {
+        String requestBody = String.format("""
+            {
+              "model": "gpt-4o-mini",
+              "messages": [
                 {
-                  "contents": [
-                    {
-                      "parts": [
-                        {
-                          "text": %s
-                        }
-                      ]
-                    }
-                  ],
-                  "generationConfig": {
-                    "temperature": 0.4,
-                    "maxOutputTokens": 8192
-                  }
+                  "role": "user",
+                  "content": %s
                 }
-                """, mapper.writeValueAsString(prompt));
-
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(GEMINI_URL + apiKey))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            System.out.println("Gemini status: " + response.statusCode());
-
-            if (response.statusCode() != 200) {
-                System.out.println("Gemini error: " + response.body());
-                return null;
+              ],
+              "temperature": 0.4,
+              "max_tokens": 16000
             }
+            """, mapper.writeValueAsString(prompt));
 
-            JsonNode root = mapper.readTree(response.body());
-            JsonNode textNode = root
-                .path("candidates")
-                .path(0)
-                .path("content")
-                .path("parts")
-                .path(0)
-                .path("text");
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(OPENAI_URL))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + apiKey)
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+            .build();
 
-            if (textNode.isMissingNode()) {
-                System.out.println("Gemini response missing text node");
-                return null;
-            }
+        HttpResponse<String> response = httpClient.send(request,
+            HttpResponse.BodyHandlers.ofString());
 
-            return textNode.asText();
+        System.out.println("OpenAI status: " + response.statusCode());
 
-        } catch (Exception e) {
-            System.out.println("Gemini call exception: " + e.getMessage());
+        if (response.statusCode() != 200) {
+            System.out.println("OpenAI error: " + response.body());
             return null;
         }
+
+        JsonNode root = mapper.readTree(response.body());
+        JsonNode textNode = root
+            .path("choices")
+            .path(0)
+            .path("message")
+            .path("content");
+
+        if (textNode.isMissingNode()) {
+            System.out.println("OpenAI response missing content node");
+            return null;
+        }
+
+        return textNode.asText();
+
+    } catch (Exception e) {
+        System.out.println("OpenAI call exception: " + e.getMessage());
+        return null;
     }
+}
 
     // ================= PARSE GEMINI JSON RESPONSE =================
     private Map<String, Object> parseGeminiResponse(String rawText) {
