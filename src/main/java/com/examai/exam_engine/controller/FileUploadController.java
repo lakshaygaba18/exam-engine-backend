@@ -27,8 +27,8 @@ import java.util.*;
 @RequestMapping("/file")
 public class FileUploadController {
 
-    private static final String OPENAI_URL =
-    "https://api.openai.com/v1/chat/completions";
+    private static final String OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -114,7 +114,6 @@ public class FileUploadController {
                 return Map.of("error", "No readable text found in the uploaded file.");
             }
 
-            // Trim to max 12000 chars to stay within token limits
             if (text.length() > 12000) {
                 text = text.substring(0, 12000);
             }
@@ -139,25 +138,26 @@ public class FileUploadController {
                 fiveMarkCount = 15; tenMarkCount = 10;
             }
 
-            // ================= GEMINI AI CALL =================
-           String apiKey = System.getenv("OPENAI_API_KEY");
-if (apiKey == null || apiKey.isBlank()) {
-    System.out.println("OPENAI_API_KEY not set, falling back to rule-based generation");
-    return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
-}
-String prompt = buildPrompt(text, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount);
-String aiResponse = callOpenAI(apiKey, prompt);
-if (aiResponse == null) {
-    System.out.println("OpenAI call failed, falling back");
-    return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
-}
+            // ================= OPENAI API CALL =================
+            String apiKey = System.getenv("OPENAI_API_KEY");
 
+            if (apiKey == null || apiKey.isBlank()) {
+                System.out.println("OPENAI_API_KEY not set, falling back to rule-based generation");
+                return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
+            }
 
-            // ================= PARSE GEMINI RESPONSE =================
-            Map<String, Object> parsed = parseGeminiResponse(geminiResponse);
+            String prompt = buildPrompt(text, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount);
+            String aiResponse = callOpenAI(apiKey, prompt);
+
+            if (aiResponse == null) {
+                System.out.println("OpenAI call failed, falling back");
+                return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
+            }
+
+            Map<String, Object> parsed = parseAIResponse(aiResponse);
 
             if (parsed == null) {
-                System.out.println("Gemini response parse failed, falling back");
+                System.out.println("OpenAI response parse failed, falling back");
                 return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
             }
 
@@ -173,108 +173,93 @@ if (aiResponse == null) {
     // ================= BUILD PROMPT =================
     private String buildPrompt(String text, int vivaCount, int oneMarkCount,
                                 int threeMarkCount, int fiveMarkCount, int tenMarkCount) {
-        return String.format("""
-            You are an expert exam question generator for university students.
-            
-            Based on the following study notes, generate exam questions in STRICT JSON format.
-            
-            RULES:
-            - Viva questions: single sentence answer, max 2 lines, direct and to the point
-            - 1 mark questions: 2-3 lines max, crisp definition or fact
-            - 3 mark questions: exactly 3 bullet points, each 1 line, key differences or steps
-            - 5 mark questions: 10-15 lines, include definition + explanation + bullet points + example
-            - 10 mark questions: detailed answer with definition, explanation, bullet points, advantages/disadvantages, applications
-            - Cheat sheet: topic name + 1 line memory trigger (formula, key fact, or definition)
-            - Only generate questions from the actual content provided
-            - Do not add any text before or after the JSON
-            
-            Generate exactly:
-            - %d viva questions
-            - %d one mark questions
-            - %d three mark questions
-            - %d five mark questions
-            - %d ten mark questions
-            - 15 cheat sheet entries
-            
-            Return ONLY this JSON structure, nothing else:
-            {
-              "objective": {
-                "viva": [
-                  {"question": "...", "answer": "..."}
-                ]
-              },
-              "subjective": {
-                "one_mark": [{"question": "...", "answer": "..."}],
-                "three_mark": [{"question": "...", "answer": "..."}],
-                "five_mark": [{"question": "...", "answer": "..."}],
-                "ten_mark": [{"question": "...", "answer": "..."}]
-              },
-              "cheat_sheet": [
-                {"topic": "...", "summary": "..."}
-              ]
-            }
-            
-            STUDY NOTES:
-            %s
-            """, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, text);
+        return String.format(
+            "You are an expert exam question generator for university students.\n\n" +
+            "Based on the following study notes, generate exam questions in STRICT JSON format.\n\n" +
+            "RULES:\n" +
+            "- Viva questions: single sentence answer, max 2 lines, direct and to the point\n" +
+            "- 1 mark questions: 2-3 lines max, crisp definition or fact\n" +
+            "- 3 mark questions: exactly 3 bullet points, each 1 line, key differences or steps\n" +
+            "- 5 mark questions: 10-15 lines, include definition + explanation + bullet points + example\n" +
+            "- 10 mark questions: detailed answer with definition, explanation, bullet points, advantages/disadvantages, applications\n" +
+            "- Cheat sheet: topic name + 1 line memory trigger (formula, key fact, or definition)\n" +
+            "- Only generate questions from the actual content provided\n" +
+            "- Do not add any text before or after the JSON\n\n" +
+            "Generate exactly:\n" +
+            "- %d viva questions\n" +
+            "- %d one mark questions\n" +
+            "- %d three mark questions\n" +
+            "- %d five mark questions\n" +
+            "- %d ten mark questions\n" +
+            "- 10 cheat sheet entries\n\n" +
+            "Return ONLY this JSON structure, nothing else:\n" +
+            "{\n" +
+            "  \"objective\": {\n" +
+            "    \"viva\": [\n" +
+            "      {\"question\": \"...\", \"answer\": \"...\"}\n" +
+            "    ]\n" +
+            "  },\n" +
+            "  \"subjective\": {\n" +
+            "    \"one_mark\": [{\"question\": \"...\", \"answer\": \"...\"}],\n" +
+            "    \"three_mark\": [{\"question\": \"...\", \"answer\": \"...\"}],\n" +
+            "    \"five_mark\": [{\"question\": \"...\", \"answer\": \"...\"}],\n" +
+            "    \"ten_mark\": [{\"question\": \"...\", \"answer\": \"...\"}]\n" +
+            "  },\n" +
+            "  \"cheat_sheet\": [\n" +
+            "    {\"topic\": \"...\", \"summary\": \"...\"}\n" +
+            "  ]\n" +
+            "}\n\n" +
+            "STUDY NOTES:\n%s",
+            vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, text
+        );
     }
 
-    // ================= CALL GEMINI API =================
+    // ================= CALL OPENAI API =================
     private String callOpenAI(String apiKey, String prompt) {
-    try {
-        String requestBody = String.format("""
-            {
-              "model": "gpt-4o-mini",
-              "messages": [
-                {
-                  "role": "user",
-                  "content": %s
-                }
-              ],
-              "temperature": 0.4,
-              "max_tokens": 16000
+        try {
+            String requestBody = String.format(
+                "{\"model\": \"gpt-4o-mini\", \"messages\": [{\"role\": \"user\", \"content\": %s}], \"temperature\": 0.4, \"max_tokens\": 16000}",
+                mapper.writeValueAsString(prompt)
+            );
+
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(OPENAI_URL))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            System.out.println("OpenAI status: " + response.statusCode());
+
+            if (response.statusCode() != 200) {
+                System.out.println("OpenAI error: " + response.body());
+                return null;
             }
-            """, mapper.writeValueAsString(prompt));
 
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(OPENAI_URL))
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer " + apiKey)
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-            .build();
+            JsonNode root = mapper.readTree(response.body());
+            JsonNode textNode = root
+                .path("choices")
+                .path(0)
+                .path("message")
+                .path("content");
 
-        HttpResponse<String> response = httpClient.send(request,
-            HttpResponse.BodyHandlers.ofString());
+            if (textNode.isMissingNode()) {
+                System.out.println("OpenAI response missing content node");
+                return null;
+            }
 
-        System.out.println("OpenAI status: " + response.statusCode());
+            return textNode.asText();
 
-        if (response.statusCode() != 200) {
-            System.out.println("OpenAI error: " + response.body());
+        } catch (Exception e) {
+            System.out.println("OpenAI call exception: " + e.getMessage());
             return null;
         }
-
-        JsonNode root = mapper.readTree(response.body());
-        JsonNode textNode = root
-            .path("choices")
-            .path(0)
-            .path("message")
-            .path("content");
-
-        if (textNode.isMissingNode()) {
-            System.out.println("OpenAI response missing content node");
-            return null;
-        }
-
-        return textNode.asText();
-
-    } catch (Exception e) {
-        System.out.println("OpenAI call exception: " + e.getMessage());
-        return null;
     }
-}
 
-    // ================= PARSE GEMINI JSON RESPONSE =================
-    private Map<String, Object> parseGeminiResponse(String rawText) {
+    // ================= PARSE AI JSON RESPONSE =================
+    private Map<String, Object> parseAIResponse(String rawText) {
         try {
             String cleaned = rawText.trim();
             if (cleaned.startsWith("```")) {
@@ -284,7 +269,7 @@ if (aiResponse == null) {
             JsonNode root = mapper.readTree(cleaned);
 
             if (!root.has("objective") || !root.has("subjective") || !root.has("cheat_sheet")) {
-                System.out.println("Gemini JSON missing required keys");
+                System.out.println("AI JSON missing required keys");
                 return null;
             }
 
