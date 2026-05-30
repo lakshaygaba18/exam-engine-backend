@@ -12,13 +12,26 @@ import org.apache.poi.xslf.usermodel.XSLFTextShape;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.io.*;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @RestController
 @RequestMapping("/file")
 public class FileUploadController {
+
+    private static final String GEMINI_URL =
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
+
+    private final ObjectMapper mapper = new ObjectMapper();
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @GetMapping("/test")
     public String test() {
@@ -36,77 +49,57 @@ public class FileUploadController {
             }
 
             String name = originalName.toLowerCase();
-            System.out.println("=== FILE DEBUG ===");
-            System.out.println("Original name: " + originalName);
-            System.out.println("Content type: " + file.getContentType());
-            System.out.println("File size: " + file.getSize());
-            System.out.println("Name lowercase: " + name);
-            System.out.println("Ends with .pdf: " + name.endsWith(".pdf"));
-            System.out.println("Ends with .pptx: " + name.endsWith(".pptx"));
-            System.out.println("Ends with .docx: " + name.endsWith(".docx"));
             String text;
             int totalPages = 1;
 
             // ================= PDF =================
             if (name.endsWith(".pdf")) {
-
                 try (PDDocument document = PDDocument.load(file.getInputStream())) {
                     PDFTextStripper stripper = new PDFTextStripper();
                     text = stripper.getText(document);
                     totalPages = document.getNumberOfPages();
+                } catch (Exception e) {
+                    return Map.of("error", "Could not read PDF. File may be corrupted or password-protected.");
                 }
-
             }
 
             // ================= DOCX =================
             else if (name.endsWith(".docx")) {
-
                 try (XWPFDocument doc = new XWPFDocument(file.getInputStream());
                      XWPFWordExtractor extractor = new XWPFWordExtractor(doc)) {
-
                     text = extractor.getText();
-                    // Estimate pages based on character count (~2500 chars per page)
                     totalPages = Math.max(1, text.length() / 2500);
                 }
-
             }
 
-            // ================= DOC (old format) =================
+            // ================= DOC =================
             else if (name.endsWith(".doc")) {
                 return Map.of("error", "Old .doc format not supported. Please convert to .docx");
             }
 
             // ================= PPTX =================
             else if (name.endsWith(".pptx")) {
-
                 StringBuilder sb = new StringBuilder();
-
                 try (XMLSlideShow ppt = new XMLSlideShow(file.getInputStream())) {
-
                     ppt.getSlides().forEach(slide -> {
                         slide.getShapes().forEach(shape -> {
                             if (shape instanceof XSLFTextShape) {
                                 String data = ((XSLFTextShape) shape).getText();
                                 if (data != null && !data.isBlank()) {
-                                    // FIX: Use ". " separator so sentences split correctly later
                                     sb.append(data.trim()).append(". ");
                                 }
                             }
                         });
                     });
-
                     text = sb.toString();
                     totalPages = ppt.getSlides().size();
                 }
-
             }
 
             // ================= TXT =================
             else if (name.endsWith(".txt")) {
-
                 text = new String(file.getBytes(), StandardCharsets.UTF_8);
                 totalPages = Math.max(1, text.length() / 2000);
-
             }
 
             else {
@@ -114,20 +107,24 @@ public class FileUploadController {
             }
 
             // ================= CLEAN TEXT =================
-            // Normalize whitespace but preserve sentence boundaries for splitting
-            text = text.replaceAll("[ \\t]+", " ")          // collapse spaces/tabs only
-                    .replaceAll("\\r\\n|\\r", "\n")       // normalize line endings
-                    .trim();
+            text = text.replaceAll("[ \\t]+", " ")
+                       .replaceAll("\\r\\n|\\r", "\n")
+                       .trim();
 
             if (text.isBlank()) {
                 return Map.of("error", "No readable text found in the uploaded file.");
             }
 
-            System.out.println("File: " + originalName + " | Extracted text length: " + text.length() + " | Pages: " + totalPages);
+            // Trim to max 12000 chars to stay within token limits
+            if (text.length() > 12000) {
+                text = text.substring(0, 12000);
+            }
+
+            System.out.println("File: " + originalName + " | Text length: " + text.length() + " | Pages: " + totalPages);
 
             // ================= QUESTION COUNT BY PAGE SIZE =================
-            int vivaCount     = 15;
-            int oneMarkCount  = 10;
+            int vivaCount      = 15;
+            int oneMarkCount   = 10;
             int threeMarkCount = 8;
             int fiveMarkCount  = 5;
             int tenMarkCount   = 2;
@@ -143,115 +140,32 @@ public class FileUploadController {
                 fiveMarkCount = 15; tenMarkCount = 10;
             }
 
-            // ================= TOPIC EXTRACTION =================
-            // Split on sentence-ending punctuation AND newlines (handles all formats)
-            String[] sentences = text.split("[.!?\\n]+");
+            // ================= GEMINI AI CALL =================
+            String apiKey = System.getenv("GEMINI_API_KEY");
 
-            List<String> topics = new ArrayList<>();
-            LinkedHashSet<String> unique = new LinkedHashSet<>();
-
-            List<String> keywords = Arrays.asList(
-                    "definition", "advantage", "disadvantage", "application",
-                    "working", "principle", "algorithm", "process", "types",
-                    "features", "components", "steps", "benefits", "formula",
-                    "important", "uses", "example", "method", "technique",
-                    "concept", "theory", "function", "purpose", "role"
-            );
-
-            // FIX: Lower threshold for non-PDF formats (notes/slides use simpler language)
-            int scoreThreshold = name.endsWith(".pdf") ? 3 : 1;
-
-            for (String s : sentences) {
-                s = s.trim();
-
-                // FIX: Widened length range (was 30–250) to catch short note-style sentences
-                if (s.length() < 20 || s.length() > 350) continue;
-
-                String lower = s.toLowerCase();
-                int score = 0;
-
-                for (String k : keywords) {
-                    if (lower.contains(k)) score += 2;
-                }
-
-                if (lower.contains("defined as") ||
-                        lower.contains("refers to") ||
-                        lower.contains("known as") ||
-                        lower.contains("is used to") ||
-                        lower.contains("can be") ||
-                        lower.contains("it is")) {
-                    score += 5;
-                }
-
-                if (score >= scoreThreshold) unique.add(s);
+            if (apiKey == null || apiKey.isBlank()) {
+                System.out.println("GEMINI_API_KEY not set, falling back to rule-based generation");
+                return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
             }
 
-            topics.addAll(unique);
+            String prompt = buildPrompt(text, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount);
+            String geminiResponse = callGemini(apiKey, prompt);
 
-            // Fallback: if still not enough topics, grab any reasonable sentence
-            if (topics.size() < 20) {
-                for (String s : sentences) {
-                    s = s.trim();
-                    // FIX: Widened range (was 35–200) to handle more content styles
-                    if (s.length() > 20 && s.length() < 350 && !topics.contains(s)) {
-                        topics.add(s);
-                    }
-                    if (topics.size() >= 60) break; // don't go overboard
-                }
+            if (geminiResponse == null) {
+                System.out.println("Gemini call failed, falling back to rule-based generation");
+                return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
             }
 
-            // Hard cap at 120 topics
-            if (topics.size() > 120) {
-                topics = topics.subList(0, 120);
+            // ================= PARSE GEMINI RESPONSE =================
+            Map<String, Object> parsed = parseGeminiResponse(geminiResponse);
+
+            if (parsed == null) {
+                System.out.println("Gemini response parse failed, falling back");
+                return fallbackGeneration(text, totalPages, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, name);
             }
 
-            System.out.println("Topics extracted: " + topics.size());
-
-            if (topics.isEmpty()) {
-                return Map.of("error", "Could not extract meaningful content from the file. Please check the file has readable text.");
-            }
-
-            // ================= BUILD VIVA QUESTIONS =================
-            List<Map<String, String>> viva = new ArrayList<>();
-
-            for (int i = 0; i < Math.min(vivaCount, topics.size()); i++) {
-                String t = topics.get(i);
-                viva.add(Map.of(
-                        "question", "What is " + shortTopic(t) + "?",
-                        "answer", generateAnswer(t, 1)
-                ));
-            }
-
-            // ================= BUILD SUBJECTIVE QUESTIONS =================
-            Map<String, List<Map<String, String>>> subjective = new HashMap<>();
-            subjective.put("one_mark",    generateQuestions(topics, oneMarkCount,   1));
-            subjective.put("three_mark",  generateQuestions(topics, threeMarkCount, 3));
-            subjective.put("five_mark",   generateQuestions(topics, fiveMarkCount,  5));
-            subjective.put("ten_mark",    generateQuestions(topics, tenMarkCount,   10));
-
-            // ================= BUILD CHEAT SHEET =================
-           // ================= BUILD CHEAT SHEET =================
-List<Map<String, Object>> cheat = new ArrayList<>();
-
-for (int i = 0; i < Math.min(20, topics.size()); i++) {
-    String t = topics.get(i).trim();
-    String topicName = extractTopicName(t);
-    String summary = extractSummary(t);
-    if (!topicName.isBlank() && !summary.isBlank()) {
-        cheat.add(Map.of(
-                "topic", topicName,
-                "summary", summary
-        ));
-    }
-}
-            // ================= BUILD RESPONSE =================
-            Map<String, Object> response = new HashMap<>();
-            response.put("objective",   Map.of("viva", viva));
-            response.put("subjective",  subjective);
-            response.put("cheat_sheet", cheat);
-            response.put("pages",       totalPages);
-
-            return response;
+            parsed.put("pages", totalPages);
+            return parsed;
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -259,114 +173,285 @@ for (int i = 0; i < Math.min(20, topics.size()); i++) {
         }
     }
 
+    // ================= BUILD PROMPT =================
+    private String buildPrompt(String text, int vivaCount, int oneMarkCount,
+                                int threeMarkCount, int fiveMarkCount, int tenMarkCount) {
+        return String.format("""
+            You are an expert exam question generator for university students.
+            
+            Based on the following study notes, generate exam questions in STRICT JSON format.
+            
+            RULES:
+            - Viva questions: single sentence answer, max 2 lines, direct and to the point
+            - 1 mark questions: 2-3 lines max, crisp definition or fact
+            - 3 mark questions: exactly 3 bullet points, each 1 line, key differences or steps
+            - 5 mark questions: 10-15 lines, include definition + explanation + bullet points + example
+            - 10 mark questions: detailed answer with definition, explanation, bullet points, advantages/disadvantages, applications
+            - Cheat sheet: topic name + 1 line memory trigger (formula, key fact, or definition)
+            - Only generate questions from the actual content provided
+            - Do not add any text before or after the JSON
+            
+            Generate exactly:
+            - %d viva questions
+            - %d one mark questions
+            - %d three mark questions
+            - %d five mark questions
+            - %d ten mark questions
+            - 15 cheat sheet entries
+            
+            Return ONLY this JSON structure, nothing else:
+            {
+              "objective": {
+                "viva": [
+                  {"question": "...", "answer": "..."}
+                ]
+              },
+              "subjective": {
+                "one_mark": [{"question": "...", "answer": "..."}],
+                "three_mark": [{"question": "...", "answer": "..."}],
+                "five_mark": [{"question": "...", "answer": "..."}],
+                "ten_mark": [{"question": "...", "answer": "..."}]
+              },
+              "cheat_sheet": [
+                {"topic": "...", "summary": "..."}
+              ]
+            }
+            
+            STUDY NOTES:
+            %s
+            """, vivaCount, oneMarkCount, threeMarkCount, fiveMarkCount, tenMarkCount, text);
+    }
+
+    // ================= CALL GEMINI API =================
+    private String callGemini(String apiKey, String prompt) {
+        try {
+            String requestBody = String.format("""
+                {
+                  "contents": [
+                    {
+                      "parts": [
+                        {
+                          "text": %s
+                        }
+                      ]
+                    }
+                  ],
+                  "generationConfig": {
+                    "temperature": 0.4,
+                    "maxOutputTokens": 8192
+                  }
+                }
+                """, mapper.writeValueAsString(prompt));
+
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(GEMINI_URL + apiKey))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            System.out.println("Gemini status: " + response.statusCode());
+
+            if (response.statusCode() != 200) {
+                System.out.println("Gemini error: " + response.body());
+                return null;
+            }
+
+            JsonNode root = mapper.readTree(response.body());
+            JsonNode textNode = root
+                .path("candidates")
+                .path(0)
+                .path("content")
+                .path("parts")
+                .path(0)
+                .path("text");
+
+            if (textNode.isMissingNode()) {
+                System.out.println("Gemini response missing text node");
+                return null;
+            }
+
+            return textNode.asText();
+
+        } catch (Exception e) {
+            System.out.println("Gemini call exception: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // ================= PARSE GEMINI JSON RESPONSE =================
+    private Map<String, Object> parseGeminiResponse(String rawText) {
+        try {
+            String cleaned = rawText.trim();
+            if (cleaned.startsWith("```")) {
+                cleaned = cleaned.replaceAll("^```[a-zA-Z]*\\n?", "").replaceAll("```$", "").trim();
+            }
+
+            JsonNode root = mapper.readTree(cleaned);
+
+            if (!root.has("objective") || !root.has("subjective") || !root.has("cheat_sheet")) {
+                System.out.println("Gemini JSON missing required keys");
+                return null;
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("objective", mapper.convertValue(root.get("objective"), Map.class));
+            result.put("subjective", mapper.convertValue(root.get("subjective"), Map.class));
+            result.put("cheat_sheet", mapper.convertValue(root.get("cheat_sheet"), List.class));
+
+            return result;
+
+        } catch (Exception e) {
+            System.out.println("Parse error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // ================= FALLBACK (rule-based) =================
+    private Map<String, Object> fallbackGeneration(String text, int totalPages,
+            int vivaCount, int oneMarkCount, int threeMarkCount,
+            int fiveMarkCount, int tenMarkCount, String name) {
+
+        String[] sentences = text.split("[.!?\\n]+");
+        List<String> topics = new ArrayList<>();
+        LinkedHashSet<String> unique = new LinkedHashSet<>();
+
+        List<String> keywords = Arrays.asList(
+                "definition", "advantage", "disadvantage", "application",
+                "working", "principle", "algorithm", "process", "types",
+                "features", "components", "steps", "benefits", "formula",
+                "important", "uses", "example", "method", "technique",
+                "concept", "theory", "function", "purpose", "role"
+        );
+
+        int scoreThreshold = name.endsWith(".pdf") ? 3 : 1;
+
+        for (String s : sentences) {
+            s = s.trim();
+            if (s.length() < 20 || s.length() > 350) continue;
+            String lower = s.toLowerCase();
+            int score = 0;
+            for (String k : keywords) { if (lower.contains(k)) score += 2; }
+            if (lower.contains("defined as") || lower.contains("refers to") ||
+                lower.contains("known as") || lower.contains("is used to") ||
+                lower.contains("can be") || lower.contains("it is")) score += 5;
+            if (score >= scoreThreshold) unique.add(s);
+        }
+
+        topics.addAll(unique);
+
+        if (topics.size() < 20) {
+            for (String s : sentences) {
+                s = s.trim();
+                if (s.length() > 20 && s.length() < 350 && !topics.contains(s)) topics.add(s);
+                if (topics.size() >= 60) break;
+            }
+        }
+
+        if (topics.size() > 120) topics = topics.subList(0, 120);
+        if (topics.isEmpty()) return Map.of("error", "Could not extract content from file.");
+
+        List<Map<String, String>> viva = new ArrayList<>();
+        for (int i = 0; i < Math.min(vivaCount, topics.size()); i++) {
+            String t = topics.get(i);
+            viva.add(Map.of("question", "What is " + shortTopic(t) + "?", "answer", generateAnswer(t, 1)));
+        }
+
+        Map<String, List<Map<String, String>>> subjective = new HashMap<>();
+        subjective.put("one_mark",    generateQuestions(topics, oneMarkCount,   1));
+        subjective.put("three_mark",  generateQuestions(topics, threeMarkCount, 3));
+        subjective.put("five_mark",   generateQuestions(topics, fiveMarkCount,  5));
+        subjective.put("ten_mark",    generateQuestions(topics, tenMarkCount,   10));
+
+        List<Map<String, Object>> cheat = new ArrayList<>();
+        for (int i = 0; i < Math.min(20, topics.size()); i++) {
+            String t = topics.get(i).trim();
+            String topicName = extractTopicName(t);
+            String summary = extractSummary(t);
+            if (!topicName.isBlank() && !summary.isBlank()) {
+                cheat.add(Map.of("topic", topicName, "summary", summary));
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("objective",   Map.of("viva", viva));
+        response.put("subjective",  subjective);
+        response.put("cheat_sheet", cheat);
+        response.put("pages",       totalPages);
+        return response;
+    }
+
     // ================= HELPERS =================
 
     private List<Map<String, String>> generateQuestions(List<String> topics, int count, int marks) {
-
         List<Map<String, String>> list = new ArrayList<>();
         Random r = new Random();
-
-        String[] starters1  = {"Define ", "What is ", "State "};
-        String[] starters3  = {"Explain ", "Describe ", "Write about "};
-        String[] starters5  = {"Explain in detail ", "Discuss ", "Illustrate "};
-        String[] starters10 = {"Discuss in detail ", "Explain elaborately ", "Describe comprehensively "};
+        String[] s1  = {"Define ", "What is ", "State "};
+        String[] s3  = {"Explain ", "Describe ", "Write about "};
+        String[] s5  = {"Explain in detail ", "Discuss ", "Illustrate "};
+        String[] s10 = {"Discuss in detail ", "Explain elaborately ", "Describe comprehensively "};
 
         for (int i = 0; i < Math.min(count, topics.size()); i++) {
             String t = shortTopic(topics.get(i));
             String q;
-
-            if (marks == 1)       q = starters1[r.nextInt(starters1.length)]   + t;
-            else if (marks == 3)  q = starters3[r.nextInt(starters3.length)]   + t;
-            else if (marks == 5)  q = starters5[r.nextInt(starters5.length)]   + t;
-            else                  q = starters10[r.nextInt(starters10.length)]  + t;
-
-            list.add(Map.of(
-                    "question", q,
-                    "answer",   generateAnswer(t, marks)
-            ));
+            if (marks == 1)       q = s1[r.nextInt(s1.length)]   + t;
+            else if (marks == 3)  q = s3[r.nextInt(s3.length)]   + t;
+            else if (marks == 5)  q = s5[r.nextInt(s5.length)]   + t;
+            else                  q = s10[r.nextInt(s10.length)]  + t;
+            list.add(Map.of("question", q, "answer", generateAnswer(t, marks)));
         }
-
         return list;
     }
 
     private String generateAnswer(String text, int mark) {
-    String cleaned = text.replaceAll("\\s+", " ").trim();
-
-    if (mark == 1) {
-        return shorten(cleaned, 100);
+        String c = text.replaceAll("\\s+", " ").trim();
+        if (mark == 1) return shorten(c, 100);
+        if (mark == 3) return "Definition: " + shorten(c, 150) + "\n\nKey Points:\n• " + extractKeyPoint(c, 0) + "\n• " + extractKeyPoint(c, 1);
+        if (mark == 5) return "Introduction:\n" + shorten(c, 180) + "\n\nExplanation:\n" + expandText(c, 200) + "\n\nKey Points:\n• " + extractKeyPoint(c, 0) + "\n• " + extractKeyPoint(c, 1) + "\n• " + extractKeyPoint(c, 2);
+        return "Introduction:\n" + shorten(c, 180) + "\n\nDetailed Explanation:\n" + expandText(c, 250) + "\n\nImportant Points:\n• " + extractKeyPoint(c, 0) + "\n• " + extractKeyPoint(c, 1) + "\n• " + extractKeyPoint(c, 2) + "\n• " + extractKeyPoint(c, 3) + "\n\nConclusion:\n" + shorten(c, 120);
     }
 
-    if (mark == 3) {
-        return "Definition: " + shorten(cleaned, 150) + "\n\n" +
-               "Key Points:\n" +
-               "• " + extractKeyPoint(cleaned, 0) + "\n" +
-               "• " + extractKeyPoint(cleaned, 1);
+    private String extractTopicName(String sentence) {
+        String cleaned = sentence.replaceAll("[^a-zA-Z0-9 ]", " ").trim();
+        String[] words = cleaned.split("\\s+");
+        Set<String> skip = new HashSet<>(Arrays.asList("a","an","the","is","are","was","were","of","in","on","at","to","for","and","or"));
+        List<String> meaningful = new ArrayList<>();
+        for (String w : words) {
+            if (w.length() > 2 && !skip.contains(w.toLowerCase())) meaningful.add(w);
+            if (meaningful.size() == 5) break;
+        }
+        return String.join(" ", meaningful);
     }
 
-    if (mark == 5) {
-        return "Introduction:\n" + shorten(cleaned, 180) + "\n\n" +
-               "Explanation:\n" + expandText(cleaned, 200) + "\n\n" +
-               "Key Points:\n" +
-               "• " + extractKeyPoint(cleaned, 0) + "\n" +
-               "• " + extractKeyPoint(cleaned, 1) + "\n" +
-               "• " + extractKeyPoint(cleaned, 2);
+    private String extractSummary(String sentence) {
+        String cleaned = sentence.replaceAll("\\s+", " ").trim();
+        if (cleaned.length() <= 120) return cleaned;
+        String cut = cleaned.substring(0, 120);
+        int lastSpace = cut.lastIndexOf(' ');
+        return lastSpace > 60 ? cut.substring(0, lastSpace) + "..." : cut + "...";
     }
 
-    return "Introduction:\n" + shorten(cleaned, 180) + "\n\n" +
-           "Detailed Explanation:\n" + expandText(cleaned, 250) + "\n\n" +
-           "Important Points:\n" +
-           "• " + extractKeyPoint(cleaned, 0) + "\n" +
-           "• " + extractKeyPoint(cleaned, 1) + "\n" +
-           "• " + extractKeyPoint(cleaned, 2) + "\n" +
-           "• " + extractKeyPoint(cleaned, 3) + "\n\n" +
-           "Conclusion:\n" + shorten(cleaned, 120);
-}
+    private String extractKeyPoint(String text, int index) {
+        String[] words = text.split("\\s+");
+        int chunkSize = Math.max(8, words.length / 4);
+        int start = Math.min(index * chunkSize, Math.max(0, words.length - chunkSize));
+        int end = Math.min(start + chunkSize, words.length);
+        String point = String.join(" ", Arrays.copyOfRange(words, start, end)).replaceAll("[^a-zA-Z0-9 ,.]", "").trim();
+        return point.isEmpty() ? "Refer to notes for details" : shorten(point, 80);
+    }
+
+    private String expandText(String text, int maxLen) {
+        String c = text.replaceAll("\\s+", " ").trim();
+        if (c.length() >= maxLen) return shorten(c, maxLen);
+        return c + " This concept is fundamental to understanding the subject.";
+    }
 
     private String shortTopic(String text) {
         String[] w = text.replaceAll("[^a-zA-Z0-9 ]", "").trim().split("\\s+");
         return String.join(" ", Arrays.copyOf(w, Math.min(6, w.length)));
     }
-    
-    private String extractTopicName(String sentence) {
-    String cleaned = sentence.replaceAll("[^a-zA-Z0-9 ]", " ").trim();
-    String[] words = cleaned.split("\\s+");
-    Set<String> skip = new HashSet<>(Arrays.asList(
-        "a", "an", "the", "is", "are", "was", "were",
-        "of", "in", "on", "at", "to", "for", "and", "or"
-    ));
-    List<String> meaningful = new ArrayList<>();
-    for (String w : words) {
-        if (w.length() > 2 && !skip.contains(w.toLowerCase())) {
-            meaningful.add(w);
-        }
-        if (meaningful.size() == 5) break;
-    }
-    return String.join(" ", meaningful);
-}
 
-private String extractSummary(String sentence) {
-    String cleaned = sentence.replaceAll("\\s+", " ").trim();
-    if (cleaned.length() <= 120) return cleaned;
-    String cut = cleaned.substring(0, 120);
-    int lastSpace = cut.lastIndexOf(' ');
-    return lastSpace > 60 ? cut.substring(0, lastSpace) + "..." : cut + "...";
-}
-
-private String extractKeyPoint(String text, int index) {
-    String[] words = text.split("\\s+");
-    int chunkSize = Math.max(8, words.length / 4);
-    int start = Math.min(index * chunkSize, Math.max(0, words.length - chunkSize));
-    int end = Math.min(start + chunkSize, words.length);
-    String[] chunk = Arrays.copyOfRange(words, start, end);
-    String point = String.join(" ", chunk).replaceAll("[^a-zA-Z0-9 ,.]", "").trim();
-    return point.isEmpty() ? "Refer to notes for details" : shorten(point, 80);
-}
-
-private String expandText(String text, int maxLen) {
-    String cleaned = text.replaceAll("\\s+", " ").trim();
-    if (cleaned.length() >= maxLen) return shorten(cleaned, maxLen);
-    return cleaned + " This concept is fundamental to understanding the subject.";
-}
     private String shorten(String s, int l) {
         return s.length() <= l ? s : s.substring(0, l) + "...";
     }
