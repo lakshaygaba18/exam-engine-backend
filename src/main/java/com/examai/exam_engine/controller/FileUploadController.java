@@ -9,7 +9,10 @@ import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xslf.usermodel.XSLFTextShape;
 
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,6 +28,7 @@ import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+@EnableScheduling
 @RestController
 @RequestMapping("/file")
 public class FileUploadController {
@@ -36,6 +40,20 @@ public class FileUploadController {
 
     // ================= IN-MEMORY CACHE =================
     private static final Map<String, Map<String, Object>> responseCache = new ConcurrentHashMap<>();
+
+    // ================= KEEP ALIVE PING =================
+    @Scheduled(fixedDelay = 840000) // every 14 minutes
+    public void keepAlive() {
+        try {
+            new RestTemplate().getForObject(
+                "https://exam-engine-backend.onrender.com/file/test",
+                String.class
+            );
+            System.out.println("Keep-alive ping sent");
+        } catch (Exception e) {
+            System.out.println("Keep-alive failed: " + e.getMessage());
+        }
+    }
 
     @GetMapping("/test")
     public String test() {
@@ -109,10 +127,12 @@ public class FileUploadController {
             else {
                 return Map.of("error", "Unsupported file format. Please upload PDF, DOCX, PPTX, or TXT.");
             }
-            
+
+            // ================= PAGE LIMIT CHECK =================
             if (totalPages > 150) {
-    return Map.of("error", "Document too large. Maximum 150 pages allowed. Your document has " + totalPages + " pages. Please upload a shorter document or split it into parts.");
-}
+                return Map.of("error", "Document too large. Maximum 150 pages allowed. Your document has " + totalPages + " pages. Please upload a shorter document or split it into parts.");
+            }
+
             // ================= CLEAN TEXT =================
             text = text.replaceAll("[ \\t]+", " ")
                        .replaceAll("\\r\\n|\\r", "\n")
@@ -212,7 +232,6 @@ public class FileUploadController {
             "  * If 'define' -> give definition + 2 key points\n" +
             "- 5 mark questions: 10-15 lines, include definition + explanation + bullet points + example\n" +
             "- 10 mark questions: detailed answer with definition, explanation, bullet points, advantages/disadvantages, applications\n" +
-            "- For 3, 5 and 10 mark questions, add an 'important' field: true if the topic is a core concept, frequently examined, or appears multiple times in notes. false otherwise.\n" +
             "- Cheat sheet: for each entry provide:\n" +
             "  * topic: short topic name (3-5 words)\n" +
             "  * summary: 2-3 lines covering the most important fact, formula, or definition\n" +
