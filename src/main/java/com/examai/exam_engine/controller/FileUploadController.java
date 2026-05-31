@@ -109,7 +109,10 @@ public class FileUploadController {
             else {
                 return Map.of("error", "Unsupported file format. Please upload PDF, DOCX, PPTX, or TXT.");
             }
-
+            
+            if (totalPages > 150) {
+    return Map.of("error", "Document too large. Maximum 150 pages allowed. Your document has " + totalPages + " pages. Please upload a shorter document or split it into parts.");
+}
             // ================= CLEAN TEXT =================
             text = text.replaceAll("[ \\t]+", " ")
                        .replaceAll("\\r\\n|\\r", "\n")
