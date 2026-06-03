@@ -139,7 +139,7 @@ public class FileUploadController {
                        .trim();
 
             if (text.isBlank()) {
-                return Map.of("error", "No readable text found in the uploaded file.");
+                return Map.of("error", "This appears to be a scanned or handwritten document. Please type out your notes in a Word document and upload that instead.");
             }
 
             if (text.length() > 12000) {
